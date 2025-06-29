@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { agreementCompletenessCheck } from '@/ai/flows/agreement-completeness-check';
 
 const offerSchema = z.object({
-    agreementType: z.string().min(1, "Please select an agreement type."),
+    agreementType: z.string().min(1, { message: "Please select an agreement type." }),
     customAgreementType: z.string().optional(),
     offerorName: z.string().min(2, 'Your name is required'),
     offerorEmail: z.string().email('A valid email for you is required'),
@@ -14,7 +14,15 @@ const offerSchema = z.object({
         name: z.string().min(2, { message: "Name must be at least 2 characters." }),
         email: z.string().email({ message: "Please enter a valid email." }),
     })).min(1, { message: "At least one other party is required." }),
-    terms: z.string().min(20, 'Agreement terms must be at least 20 characters'),
+    terms: z.string().min(20, 'The agreement purpose must be at least 20 characters'),
+    specificTerms: z.array(z.object({
+        title: z.string().min(1, { message: "Term title cannot be empty." }),
+        description: z.string().min(1, { message: "Term description cannot be empty." }),
+    })).optional(),
+    paymentAmount: z.string().optional(),
+    paymentDueDate: z.string().optional(),
+    paymentMethod: z.string().optional(),
+    duration: z.string().optional(),
     location: z.string().optional(),
 }).refine(data => {
     if (data.agreementType === 'Other') {

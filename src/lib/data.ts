@@ -6,10 +6,21 @@ export type Offeree = {
   email: string;
 };
 
+export type SpecificTerm = {
+  title: string;
+  description: string;
+};
+
 export type Offer = {
   id: string;
   title: string;
   terms: string;
+  specificTerms?: SpecificTerm[];
+  paymentAmount?: string;
+  paymentDueDate?: string;
+  paymentMethod?: string;
+  duration?: string;
+  location?: string;
   offerorName: string;
   offerorEmail: string;
   offerees: Offeree[];
@@ -29,6 +40,15 @@ const offers: Offer[] = [
         status: 'pending',
         createdAt: new Date(new Date().setDate(new Date().getDate() - 1)),
         acceptedAt: null,
+        location: 'New York, NY',
+        specificTerms: [
+            { title: 'Deliverable 1', description: '3 initial logo concepts.' },
+            { title: 'Revisions', description: 'Up to 3 rounds of revisions on the chosen concept.' },
+            { title: 'Final Delivery', description: 'Final logo in SVG and PNG formats.' },
+        ],
+        paymentAmount: '$1,200',
+        paymentDueDate: 'Upon final delivery',
+        paymentMethod: 'Bank Transfer'
     },
     {
         id: 'jadan-sent-2',
@@ -40,6 +60,7 @@ const offers: Offer[] = [
         status: 'accepted',
         createdAt: new Date(new Date().setDate(new Date().getDate() - 20)),
         acceptedAt: new Date(new Date().setDate(new Date().getDate() - 18)),
+        duration: '1 month from start date.'
     },
     {
         id: 'jadan-received-1',
@@ -51,6 +72,7 @@ const offers: Offer[] = [
         status: 'pending',
         createdAt: new Date(new Date().setDate(new Date().getDate() - 2)),
         acceptedAt: null,
+        location: '123 Main St, Anytown, USA'
     },
     {
         id: 'jadan-received-2',

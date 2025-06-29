@@ -12,13 +12,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Handshake, Users, FileText, MapPin, Search, CheckCircle, Copy, Loader2, ArrowLeft, ArrowRight, Lightbulb, ShieldCheck, AlertTriangle, PartyPopper, Plus, Trash2 } from 'lucide-react';
+import { Handshake, Users, FileText, MapPin, Search, CheckCircle, Copy, Loader2, ArrowLeft, ArrowRight, Lightbulb, ShieldCheck, AlertTriangle, PartyPopper, Plus, Trash2, User, Mail } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import type { Offer } from '@/lib/data';
-import type { AgreementCompletenessCheckOutput } from '@/ai/flows/agreement-completeness-check';
+import type { Offer, SpecificTerm } from '@/lib/data';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { Separator } from '@/components/ui/separator';
 
 const offerSchema = z.object({
     agreementType: z.string().min(1, { message: "Please select an agreement type." }),
@@ -29,7 +29,15 @@ const offerSchema = z.object({
         name: z.string().min(2, { message: "Name must be at least 2 characters." }),
         email: z.string().email({ message: "Please enter a valid email." }),
     })).min(1, { message: "At least one other party is required." }),
-    terms: z.string().min(20, { message: "Terms must be at least 20 characters." }),
+    terms: z.string().min(20, { message: "The agreement purpose must be at least 20 characters." }),
+    specificTerms: z.array(z.object({
+        title: z.string().min(1, { message: "Term title cannot be empty." }),
+        description: z.string().min(1, { message: "Term description cannot be empty." }),
+    })).optional(),
+    paymentAmount: z.string().optional(),
+    paymentDueDate: z.string().optional(),
+    paymentMethod: z.string().optional(),
+    duration: z.string().optional(),
     location: z.string().optional(),
 }).refine(data => {
     if (data.agreementType === 'Other') {
@@ -41,13 +49,15 @@ const offerSchema = z.object({
     path: ["customAgreementType"],
 });
 
-type OfferFormData = z.infer<typeof offerSchema>;
+export type OfferFormData = z.infer<typeof offerSchema>;
 type FieldName = keyof OfferFormData;
+
+// --- Helper Components ---
 
 const steps = [
     { id: 1, name: 'Agreement Type', fields: ['agreementType', 'customAgreementType'], icon: Handshake },
     { id: 2, name: 'Parties', fields: ['offerorName', 'offerorEmail', 'offerees'], icon: Users },
-    { id: 3, name: 'Terms', fields: ['terms'], icon: FileText },
+    { id: 3, name: 'Terms', fields: ['terms', 'specificTerms', 'paymentAmount', 'paymentDueDate', 'paymentMethod', 'duration'], icon: FileText },
     { id: 4, name: 'Location', fields: ['location'], icon: MapPin },
     { id: 5, name: 'Review', fields: [], icon: Search },
     { id: 6, name: 'Complete', fields: [], icon: CheckCircle },
@@ -60,6 +70,9 @@ const FormStep = ({ title, description, children }: { title: string, description
         <div className="space-y-6">{children}</div>
     </div>
 );
+
+
+// --- Step Components ---
 
 const AgreementTypeStep = () => {
     const { control, watch, formState: { errors } } = useFormContext<OfferFormData>();
@@ -165,7 +178,8 @@ const PartiesStep = () => {
 };
 
 const TermsStep = () => {
-    const { register, watch, formState: { errors } } = useFormContext<OfferFormData>();
+    const { register, control, watch, formState: { errors } } = useFormContext<OfferFormData>();
+    const { fields, append, remove } = useFieldArray({ control, name: "specificTerms" });
     const [aiResult, setAiResult] = useState<AgreementCompletenessCheckOutput & { error?: string } | null>(null);
     const [isChecking, setIsChecking] = useState(false);
     const terms = watch('terms');
@@ -179,57 +193,117 @@ const TermsStep = () => {
     };
 
     return (
-        <FormStep title="What's the deal?" description="Clearly and concisely describe the exchange. What is being offered, and what is expected in return?">
+        <FormStep title="What's the deal?" description="Describe the core purpose of your agreement, then add specific terms for clarity.">
             <div className="space-y-2">
-                <Label htmlFor="terms">Terms of Agreement</Label>
-                <Textarea id="terms" {...register('terms')} placeholder="e.g., I will pay $100 for your used bicycle on July 1st, 2025. The bicycle is sold as-is." rows={8} />
+                <Label htmlFor="terms">Purpose of Agreement</Label>
+                <Textarea id="terms" {...register('terms')} placeholder="e.g., To formalize the sale of a used bicycle from the Offeror to the Offeree." rows={4} />
                 {errors.terms && <p className="text-sm font-medium text-destructive">{errors.terms.message}</p>}
             </div>
-            {aiResult && (
-                <Card className="bg-secondary/50">
-                    <CardContent className="pt-6">
-                        {aiResult.error ? (
-                            <Alert variant="destructive">
-                                <AlertTriangle className="h-4 w-4" />
-                                <AlertTitle>Error</AlertTitle>
-                                <AlertDescription>{aiResult.error}</AlertDescription>
-                            </Alert>
-                        ) : (
-                            <div className="space-y-4">
-                                {aiResult.isComplete ? (
-                                    <Alert variant="default" className="bg-green-100 dark:bg-green-900/30 border-green-300 dark:border-green-700">
-                                        <ShieldCheck className="h-4 w-4 text-green-600 dark:text-green-400" />
-                                        <AlertTitle className="text-green-800 dark:text-green-300">Looks Good!</AlertTitle>
-                                        <AlertDescription className="text-green-700 dark:text-green-400">This agreement appears to be comprehensive.</AlertDescription>
-                                    </Alert>
-                                ) : (
-                                    <Alert variant="destructive">
-                                        <AlertTriangle className="h-4 w-4" />
-                                        <AlertTitle>Potentially Missing Details</AlertTitle>
-                                        <AlertDescription>
-                                            <ul className="list-disc pl-5 mt-2">{aiResult.missingDetails?.map((detail, i) => <li key={i}>{detail}</li>)}</ul>
-                                        </AlertDescription>
-                                    </Alert>
-                                )}
 
-                                {aiResult.suggestions && aiResult.suggestions.length > 0 && (
-                                    <Alert>
-                                        <Lightbulb className="h-4 w-4" />
-                                        <AlertTitle>Suggestions for Improvement</AlertTitle>
-                                        <AlertDescription>
-                                            <ul className="list-disc pl-5 mt-2">{aiResult.suggestions.map((suggestion, i) => <li key={i}>{suggestion}</li>)}</ul>
-                                        </AlertDescription>
-                                    </Alert>
-                                )}
+            <Card className="bg-secondary/50">
+                <CardHeader>
+                     <CardTitle className="text-lg">Specific Terms & Conditions</CardTitle>
+                    <CardDescription>Add specific, numbered terms to your agreement. This is optional but highly recommended for clarity.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                     {fields.map((field, index) => (
+                        <div key={field.id} className="p-4 border rounded-md space-y-4 bg-background relative">
+                            <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2 text-muted-foreground hover:text-destructive" onClick={() => remove(index)}>
+                                <Trash2 className="w-4 h-4" />
+                            </Button>
+                            <div className="space-y-2">
+                                <Label htmlFor={`specificTerms.${index}.title`}>Term {index + 1} Title</Label>
+                                <Input id={`specificTerms.${index}.title`} {...register(`specificTerms.${index}.title`)} placeholder="e.g., The Product" />
+                                {errors.specificTerms?.[index]?.title && <p className="text-sm font-medium text-destructive">{errors.specificTerms?.[index]?.title?.message}</p>}
                             </div>
-                        )}
-                    </CardContent>
-                </Card>
-            )}
-            <Button type="button" variant="outline" onClick={handleCheckCompleteness} disabled={isChecking || !terms || terms.length < 20}>
-                {isChecking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2" />}
-                AI Completeness Check
-            </Button>
+                            <div className="space-y-2">
+                                <Label htmlFor={`specificTerms.${index}.description`}>Term {index + 1} Description</Label>
+                                <Textarea id={`specificTerms.${index}.description`} {...register(`specificTerms.${index}.description`)} placeholder="e.g., One (1) used bicycle, sold as-is." rows={2} />
+                                {errors.specificTerms?.[index]?.description && <p className="text-sm font-medium text-destructive">{errors.specificTerms?.[index]?.description?.message}</p>}
+                            </div>
+                        </div>
+                    ))}
+                </CardContent>
+                <CardFooter>
+                    <Button type="button" variant="outline" onClick={() => append({ title: "", description: "" })}>
+                        <Plus className="mr-2" /> Add Term
+                    </Button>
+                </CardFooter>
+            </Card>
+            
+            <Card className="bg-secondary/50">
+                <CardHeader>
+                    <CardTitle className="text-lg">Other Details (Optional)</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="grid sm:grid-cols-3 gap-4">
+                        <div className="space-y-2">
+                            <Label>Payment Amount</Label>
+                            <Input {...register('paymentAmount')} placeholder="e.g., $100.00" />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Payment Due Date</Label>
+                            <Input {...register('paymentDueDate')} placeholder="e.g., Upon delivery" />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Payment Method</Label>
+                            <Input {...register('paymentMethod')} placeholder="e.g., Cash" />
+                        </div>
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Duration / Completion Date</Label>
+                        <Input {...register('duration')} placeholder="e.g., Agreement concludes upon payment." />
+                    </div>
+                </CardContent>
+            </Card>
+
+            <div>
+                {aiResult && (
+                    <Card className="bg-background">
+                        <CardContent className="pt-6">
+                            {aiResult.error ? (
+                                <Alert variant="destructive">
+                                    <AlertTriangle className="h-4 w-4" />
+                                    <AlertTitle>Error</AlertTitle>
+                                    <AlertDescription>{aiResult.error}</AlertDescription>
+                                </Alert>
+                            ) : (
+                                <div className="space-y-4">
+                                    {aiResult.isComplete ? (
+                                        <Alert variant="default" className="bg-green-100 dark:bg-green-900/30 border-green-300 dark:border-green-700">
+                                            <ShieldCheck className="h-4 w-4 text-green-600 dark:text-green-400" />
+                                            <AlertTitle className="text-green-800 dark:text-green-300">Looks Good!</AlertTitle>
+                                            <AlertDescription className="text-green-700 dark:text-green-400">The purpose statement appears to be comprehensive.</AlertDescription>
+                                        </Alert>
+                                    ) : (
+                                        <Alert variant="destructive">
+                                            <AlertTriangle className="h-4 w-4" />
+                                            <AlertTitle>Potentially Missing Details</AlertTitle>
+                                            <AlertDescription>
+                                                <ul className="list-disc pl-5 mt-2">{aiResult.missingDetails?.map((detail, i) => <li key={i}>{detail}</li>)}</ul>
+                                            </AlertDescription>
+                                        </Alert>
+                                    )}
+
+                                    {aiResult.suggestions && aiResult.suggestions.length > 0 && (
+                                        <Alert>
+                                            <Lightbulb className="h-4 w-4" />
+                                            <AlertTitle>Suggestions for Improvement</AlertTitle>
+                                            <AlertDescription>
+                                                <ul className="list-disc pl-5 mt-2">{aiResult.suggestions.map((suggestion, i) => <li key={i}>{suggestion}</li>)}</ul>
+                                            </AlertDescription>
+                                        </Alert>
+                                    )}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                )}
+                <Button type="button" variant="outline" onClick={handleCheckCompleteness} disabled={isChecking || !terms || terms.length < 20}>
+                    {isChecking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2" />}
+                    AI Completeness Check (on Purpose)
+                </Button>
+            </div>
         </FormStep>
     );
 };
@@ -239,65 +313,150 @@ const LocationStep = () => {
     return (
         <FormStep title="Where is this happening?" description="Knowing the location can help define the governing law for your handshake. This is optional.">
             <div className="space-y-2">
-                <Label htmlFor="location">Location (e.g., City, State, or Address)</Label>
-                <Input id="location" {...register('location')} placeholder="e.g., San Francisco, CA" />
-                <p className="text-sm text-muted-foreground">Note: In a full version, this could use Google Maps for precise address lookup.</p>
+                <Label htmlFor="location">Governing Law (e.g., State, Country)</Label>
+                <Input id="location" {...register('location')} placeholder="e.g., California, USA" />
+                <p className="text-sm text-muted-foreground">This helps determine which jurisdiction's laws apply to the agreement.</p>
                 {errors.location && <p className="text-sm font-medium text-destructive">{errors.location.message}</p>}
             </div>
         </FormStep>
     );
 };
 
+function AgreementPreview({ data, onEdit }: { data: OfferFormData, onEdit: (step: number) => void }) {
+    const agreementDate = new Date().toLocaleDateString();
+    const title = data.agreementType === 'Other' ? data.customAgreementType : data.agreementType;
+    const offereeTitle = (data.offerees?.length || 0) > 1 ? "PARTIES (B)" : "PARTY (B)";
+
+    return (
+        <Card className="font-sans">
+            <CardHeader>
+                <CardTitle className="font-headline text-2xl">{title}</CardTitle>
+                <CardDescription>Agreement Date: {agreementDate}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6 text-sm">
+                <section>
+                    <h3 className="font-bold text-base mb-2 flex justify-between items-center">
+                        1. Parties Involved <Button variant="ghost" size="sm" onClick={() => onEdit(2)}>Edit</Button>
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-md bg-muted/30">
+                        <div>
+                            <h4 className="font-semibold text-muted-foreground">PARTY (A) - OFFEROR</h4>
+                            <p className="flex items-center gap-2 mt-1"><User className="w-4 h-4" /> {data.offerorName}</p>
+                            <p className="flex items-center gap-2 mt-1"><Mail className="w-4 h-4" /> {data.offerorEmail}</p>
+                        </div>
+                        <div>
+                            <h4 className="font-semibold text-muted-foreground">{offereeTitle} - OFFEREE(S)</h4>
+                            {data.offerees?.map((offeree, index) => (
+                                <div key={index} className={data.offerees && data.offerees.length > 1 ? "mt-2" : "mt-1"}>
+                                    <p className="flex items-center gap-2"><User className="w-4 h-4" /> {offeree.name}</p>
+                                    <p className="flex items-center gap-2 mt-1"><Mail className="w-4 h-4" /> {offeree.email}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </section>
+                
+                <section>
+                     <h3 className="font-bold text-base mb-2 flex justify-between items-center">
+                        2. Purpose of Agreement <Button variant="ghost" size="sm" onClick={() => onEdit(3)}>Edit</Button>
+                    </h3>
+                     <p className="whitespace-pre-wrap">{data.terms}</p>
+                </section>
+                
+                <Separator />
+                
+                {(data.specificTerms && data.specificTerms.length > 0) && (
+                    <section>
+                        <h3 className="font-bold text-base mb-2 flex justify-between items-center">
+                            3. Agreed Terms and Conditions <Button variant="ghost" size="sm" onClick={() => onEdit(3)}>Edit</Button>
+                        </h3>
+                        <ul className="space-y-3 pl-5">
+                            {data.specificTerms.map((term, index) => (
+                                <li key={index}>
+                                    <span className="font-semibold">{term.title}:</span>
+                                    <p className="text-muted-foreground whitespace-pre-wrap">{term.description}</p>
+                                </li>
+                            ))}
+                        </ul>
+                    </section>
+                )}
+
+                {(data.paymentAmount || data.paymentDueDate || data.paymentMethod) && (
+                    <section>
+                        <h4 className="font-semibold mb-1 flex justify-between items-center">
+                           Payment Terms <Button variant="ghost" size="sm" onClick={() => onEdit(3)}>Edit</Button>
+                        </h4>
+                        <div className="p-3 border rounded-md bg-muted/30 text-xs space-y-1">
+                           {data.paymentAmount && <p><strong>Amount:</strong> {data.paymentAmount}</p>}
+                           {data.paymentDueDate && <p><strong>Due Date:</strong> {data.paymentDueDate}</p>}
+                           {data.paymentMethod && <p><strong>Method:</strong> {data.paymentMethod}</p>}
+                        </div>
+                    </section>
+                )}
+                
+                {data.duration && (
+                    <section>
+                         <h4 className="font-semibold mb-1 flex justify-between items-center">
+                            Duration/Completion <Button variant="ghost" size="sm" onClick={() => onEdit(3)}>Edit</Button>
+                        </h4>
+                         <p>{data.duration}</p>
+                    </section>
+                )}
+                
+                <Separator />
+                
+                <section className="space-y-4 text-xs text-muted-foreground">
+                    <div>
+                        <h3 className="font-bold text-sm text-foreground mb-1">4. Dispute Resolution</h3>
+                        <p>In the event of a dispute arising out of or in connection with this Agreement, the Parties agree to first attempt to resolve the dispute through good faith negotiation.</p>
+                    </div>
+                     {data.location && (
+                        <div>
+                            <h3 className="font-bold text-sm text-foreground mb-1 flex justify-between items-center">
+                                5. Governing Law <Button variant="ghost" size="sm" onClick={() => onEdit(4)}>Edit</Button>
+                            </h3>
+                            <p>This Agreement shall be governed by and construed in accordance with the laws of {data.location}, without regard to its conflict of laws principles.</p>
+                        </div>
+                     )}
+                     <div>
+                         <h3 className="font-bold text-sm text-foreground mb-1">6. Entire Agreement</h3>
+                         <p>This document constitutes the entire Agreement between the Parties regarding the subject matter herein and supersedes all prior discussions, negotiations, and agreements, whether oral or written.</p>
+                     </div>
+                </section>
+
+                <Separator />
+
+                <section>
+                     <h3 className="font-bold text-base mb-2">7. Signatures</h3>
+                     <p className="text-xs text-muted-foreground mb-4">By signing below, the Parties acknowledge that they have read, understood, and agree to the terms and conditions set forth in this Simple Agreement.</p>
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4">
+                         <div>
+                             <div className="mt-8 border-b pb-1">
+                                <p className="font-semibold">{data.offerorName}</p>
+                             </div>
+                             <p className="text-xs text-muted-foreground">Party A Signature</p>
+                         </div>
+                         <div>
+                             <div className="mt-8 border-b pb-1">
+                                <p className="text-muted-foreground italic">Awaiting signature...</p>
+                             </div>
+                             <p className="text-xs text-muted-foreground">Party B Signature</p>
+                         </div>
+                     </div>
+                </section>
+            </CardContent>
+        </Card>
+    );
+}
+
+
 const ReviewStep = ({ onEdit }: { onEdit: (step: number) => void }) => {
     const { getValues } = useFormContext<OfferFormData>();
     const data = getValues();
-    const title = data.agreementType === 'Other' ? data.customAgreementType : data.agreementType;
-
+    
     return (
         <FormStep title="Ready to shake?" description="Take a moment to ensure everything looks right. Once confirmed, your agreement will be created.">
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex justify-between items-center">
-                        <span>{title}</span>
-                        <Button variant="ghost" size="sm" onClick={() => onEdit(1)}>Edit</Button>
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div>
-                        <div className="flex justify-between items-center">
-                            <h4 className="font-semibold text-muted-foreground">PARTIES</h4>
-                            <Button variant="ghost" size="sm" onClick={() => onEdit(2)}>Edit</Button>
-                        </div>
-                        <div className="text-sm space-y-2">
-                            <p><strong>From:</strong> {data.offerorName} ({data.offerorEmail})</p>
-                            <div>
-                                <strong>To:</strong>
-                                <ul className="list-disc pl-5">
-                                {data.offerees.map((offeree, index) => (
-                                    <li key={index}>{offeree.name} ({offeree.email})</li>
-                                ))}
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="pt-2">
-                        <div className="flex justify-between items-center">
-                            <h4 className="font-semibold text-muted-foreground">TERMS</h4>
-                            <Button variant="ghost" size="sm" onClick={() => onEdit(3)}>Edit</Button>
-                        </div>
-                        <p className="text-sm whitespace-pre-wrap p-2 border rounded-md bg-background">{data.terms}</p>
-                    </div>
-                    {data.location && (
-                        <div className="pt-2">
-                             <div className="flex justify-between items-center">
-                                <h4 className="font-semibold text-muted-foreground">LOCATION</h4>
-                                <Button variant="ghost" size="sm" onClick={() => onEdit(4)}>Edit</Button>
-                            </div>
-                            <p className="text-sm">{data.location}</p>
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
+            <AgreementPreview data={data} onEdit={onEdit} />
             <Alert>
                 <AlertTriangle className="h-4 w-4" />
                 <AlertTitle>Disclaimer</AlertTitle>
@@ -314,7 +473,6 @@ const SuccessStep = ({ offer, onReset }: { offer: Offer, onReset: () => void }) 
     const [offerUrl, setOfferUrl] = useState('');
 
     useEffect(() => {
-        // window is only available on the client
         if (typeof window !== 'undefined') {
           setOfferUrl(`${window.location.origin}/offers/${offer.id}`);
         }
@@ -356,6 +514,7 @@ const SuccessStep = ({ offer, onReset }: { offer: Offer, onReset: () => void }) 
     );
 }
 
+// --- Main Form Component ---
 
 export function CreateOfferForm() {
     const [currentStep, setCurrentStep] = useState(1);
@@ -370,6 +529,11 @@ export function CreateOfferForm() {
             offerorEmail: '',
             offerees: [{ name: '', email: '' }],
             terms: '',
+            specificTerms: [],
+            paymentAmount: '',
+            paymentDueDate: '',
+            paymentMethod: '',
+            duration: '',
             location: '',
             agreementType: '',
             customAgreementType: '',
