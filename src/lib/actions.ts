@@ -3,47 +3,52 @@
 import { z } from 'zod';
 import { addOffer, updateOfferStatus } from './data';
 import { revalidatePath } from 'next/cache';
-import { redirect } from 'next/navigation';
 import { agreementCompletenessCheck } from '@/ai/flows/agreement-completeness-check';
 
 const offerSchema = z.object({
-    title: z.string().min(3, 'Title must be at least 3 characters'),
+    agreementType: z.string().min(1, "Please select an agreement type."),
+    customAgreementType: z.string().optional(),
     offerorName: z.string().min(2, 'Your name is required'),
     offerorEmail: z.string().email('A valid email for you is required'),
     offereeName: z.string().min(2, 'Their name is required'),
     offereeEmail: z.string().email('A valid email for them is required'),
     terms: z.string().min(20, 'Agreement terms must be at least 20 characters'),
+    location: z.string().optional(),
+}).refine(data => {
+    if (data.agreementType === 'Other') {
+        return !!data.customAgreementType && data.customAgreementType.trim().length > 2;
+    }
+    return true;
+}, {
+    message: "Please specify the agreement type (at least 3 characters).",
+    path: ["customAgreementType"],
 });
 
-export type FormState = {
-    message: string;
-    errors?: {
-        title?: string[];
-        offerorName?: string[];
-        offerorEmail?: string[];
-        offereeName?: string[];
-        offereeEmail?: string[];
-        terms?: string[];
-    };
-};
 
-export async function createOffer(prevState: FormState, formData: FormData): Promise<FormState> {
-    const validatedFields = offerSchema.safeParse(Object.fromEntries(formData.entries()));
+export async function createOffer(data: unknown) {
+    const validatedFields = offerSchema.safeParse(data);
 
     if (!validatedFields.success) {
         return {
+            success: false,
             message: 'Validation failed. Please check your input.',
             errors: validatedFields.error.flatten().fieldErrors,
         };
     }
 
     try {
-        const newOffer = await addOffer(validatedFields.data);
+        const { agreementType, customAgreementType, ...rest } = validatedFields.data;
+        const title = agreementType === 'Other' && customAgreementType ? customAgreementType : agreementType;
+
+        const newOffer = await addOffer({ ...rest, title });
         revalidatePath('/dashboard');
         revalidatePath(`/offers/${newOffer.id}`);
-        redirect(`/offers/${newOffer.id}`);
+
+        return { success: true, offer: newOffer };
     } catch (error) {
+        console.error(error);
         return {
+            success: false,
             message: 'Failed to create offer. Please try again.',
         };
     }
