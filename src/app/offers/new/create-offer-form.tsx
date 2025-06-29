@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition, type ReactNode } from 'react';
+import { useState, useTransition, type ReactNode, useEffect } from 'react';
 import { useForm, FormProvider, Controller, useFormContext } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -280,9 +280,14 @@ const ReviewStep = ({ onEdit }: { onEdit: (step: number) => void }) => {
 
 const SuccessStep = ({ offer, onReset }: { offer: Offer, onReset: () => void }) => {
     const { toast } = useToast();
-    const offerUrl = `${window.location.origin}/offers/${offer.id}`;
+    const [offerUrl, setOfferUrl] = useState('');
+
+    useEffect(() => {
+        setOfferUrl(`${window.location.origin}/offers/${offer.id}`);
+    }, [offer.id]);
     
     const copyToClipboard = (text: string) => {
+        if (!text) return;
         navigator.clipboard.writeText(text);
         toast({ title: "Copied!", description: "The URL has been copied to your clipboard." });
     }
@@ -293,12 +298,19 @@ const SuccessStep = ({ offer, onReset }: { offer: Offer, onReset: () => void }) 
             <h2 className="text-3xl font-bold font-headline">Your Handshake is Ready!</h2>
             <p className="text-muted-foreground mt-2 mb-6">Share this unique link with the other party so they can view and accept your terms.</p>
             
-            <div className="bg-muted/50 rounded-lg p-4 flex items-center justify-between gap-4 max-w-lg mx-auto">
-                <p className="text-sm font-mono truncate">{offerUrl}</p>
-                <Button size="icon" variant="ghost" onClick={() => copyToClipboard(offerUrl)}>
-                    <Copy className="h-5 w-5" />
-                </Button>
-            </div>
+            {offerUrl ? (
+                <div className="bg-muted/50 rounded-lg p-4 flex items-center justify-between gap-4 max-w-lg mx-auto">
+                    <p className="text-sm font-mono truncate">{offerUrl}</p>
+                    <Button size="icon" variant="ghost" onClick={() => copyToClipboard(offerUrl)}>
+                        <Copy className="h-5 w-5" />
+                    </Button>
+                </div>
+            ) : (
+                 <div className="bg-muted/50 rounded-lg p-4 flex items-center justify-center gap-4 max-w-lg mx-auto">
+                    <Loader2 className="w-5 h-5 animate-spin"/>
+                    <p className="text-sm font-mono">Generating shareable link...</p>
+                </div>
+            )}
 
             <div className="flex flex-col sm:flex-row justify-center gap-4 mt-8">
                 <Button asChild size="lg">
@@ -373,13 +385,15 @@ export function CreateOfferForm() {
         return <SuccessStep offer={createdOffer} onReset={handleReset} />
     }
 
+    const StepIcon = steps[currentStep - 1].icon;
+
     return (
         <FormProvider {...methods}>
             <Card>
                 <CardHeader>
                     <div className="flex items-center gap-4">
                          <div className="bg-primary/10 p-3 rounded-full">
-                            <steps[currentStep-1].icon className="w-6 h-6 text-primary" />
+                            <StepIcon className="w-6 h-6 text-primary" />
                          </div>
                          <div>
                             <p className="text-sm font-medium text-primary">Step {currentStep} of 5</p>
