@@ -12,13 +12,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Handshake, Users, FileText, MapPin, Search, CheckCircle, Copy, Loader2, ArrowLeft, ArrowRight, Lightbulb, ShieldCheck, AlertTriangle, PartyPopper, Plus, Trash2, User, Mail } from 'lucide-react';
+import { Handshake, Users, FileText, MapPin, Search, CheckCircle, Copy, Loader2, ArrowLeft, ArrowRight, Lightbulb, ShieldCheck, AlertTriangle, PartyPopper, Plus, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import type { Offer, SpecificTerm } from '@/lib/data';
+import type { Offer } from '@/lib/data';
+import { AgreementCompletenessCheckOutput } from '@/ai/flows/agreement-completeness-check';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import { Separator } from '@/components/ui/separator';
+import { AgreementPreview } from '@/components/common/agreement-preview';
 
 const offerSchema = z.object({
     agreementType: z.string().min(1, { message: "Please select an agreement type." }),
@@ -321,134 +322,6 @@ const LocationStep = () => {
         </FormStep>
     );
 };
-
-function AgreementPreview({ data, onEdit }: { data: OfferFormData, onEdit: (step: number) => void }) {
-    const agreementDate = new Date().toLocaleDateString();
-    const title = data.agreementType === 'Other' ? data.customAgreementType : data.agreementType;
-    const offereeTitle = (data.offerees?.length || 0) > 1 ? "PARTIES (B)" : "PARTY (B)";
-
-    return (
-        <Card className="font-sans">
-            <CardHeader>
-                <CardTitle className="font-headline text-2xl">{title}</CardTitle>
-                <CardDescription>Agreement Date: {agreementDate}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6 text-sm">
-                <section>
-                    <h3 className="font-bold text-base mb-2 flex justify-between items-center">
-                        1. Parties Involved <Button variant="ghost" size="sm" onClick={() => onEdit(2)}>Edit</Button>
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-md bg-muted/30">
-                        <div>
-                            <h4 className="font-semibold text-muted-foreground">PARTY (A) - OFFEROR</h4>
-                            <p className="flex items-center gap-2 mt-1"><User className="w-4 h-4" /> {data.offerorName}</p>
-                            <p className="flex items-center gap-2 mt-1"><Mail className="w-4 h-4" /> {data.offerorEmail}</p>
-                        </div>
-                        <div>
-                            <h4 className="font-semibold text-muted-foreground">{offereeTitle} - OFFEREE(S)</h4>
-                            {data.offerees?.map((offeree, index) => (
-                                <div key={index} className={data.offerees && data.offerees.length > 1 ? "mt-2" : "mt-1"}>
-                                    <p className="flex items-center gap-2"><User className="w-4 h-4" /> {offeree.name}</p>
-                                    <p className="flex items-center gap-2 mt-1"><Mail className="w-4 h-4" /> {offeree.email}</p>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </section>
-                
-                <section>
-                     <h3 className="font-bold text-base mb-2 flex justify-between items-center">
-                        2. Purpose of Agreement <Button variant="ghost" size="sm" onClick={() => onEdit(3)}>Edit</Button>
-                    </h3>
-                     <p className="whitespace-pre-wrap">{data.terms}</p>
-                </section>
-                
-                <Separator />
-                
-                {(data.specificTerms && data.specificTerms.length > 0) && (
-                    <section>
-                        <h3 className="font-bold text-base mb-2 flex justify-between items-center">
-                            3. Agreed Terms and Conditions <Button variant="ghost" size="sm" onClick={() => onEdit(3)}>Edit</Button>
-                        </h3>
-                        <ul className="space-y-3 pl-5">
-                            {data.specificTerms.map((term, index) => (
-                                <li key={index}>
-                                    <span className="font-semibold">{term.title}:</span>
-                                    <p className="text-muted-foreground whitespace-pre-wrap">{term.description}</p>
-                                </li>
-                            ))}
-                        </ul>
-                    </section>
-                )}
-
-                {(data.paymentAmount || data.paymentDueDate || data.paymentMethod) && (
-                    <section>
-                        <h4 className="font-semibold mb-1 flex justify-between items-center">
-                           Payment Terms <Button variant="ghost" size="sm" onClick={() => onEdit(3)}>Edit</Button>
-                        </h4>
-                        <div className="p-3 border rounded-md bg-muted/30 text-xs space-y-1">
-                           {data.paymentAmount && <p><strong>Amount:</strong> {data.paymentAmount}</p>}
-                           {data.paymentDueDate && <p><strong>Due Date:</strong> {data.paymentDueDate}</p>}
-                           {data.paymentMethod && <p><strong>Method:</strong> {data.paymentMethod}</p>}
-                        </div>
-                    </section>
-                )}
-                
-                {data.duration && (
-                    <section>
-                         <h4 className="font-semibold mb-1 flex justify-between items-center">
-                            Duration/Completion <Button variant="ghost" size="sm" onClick={() => onEdit(3)}>Edit</Button>
-                        </h4>
-                         <p>{data.duration}</p>
-                    </section>
-                )}
-                
-                <Separator />
-                
-                <section className="space-y-4 text-xs text-muted-foreground">
-                    <div>
-                        <h3 className="font-bold text-sm text-foreground mb-1">4. Dispute Resolution</h3>
-                        <p>In the event of a dispute arising out of or in connection with this Agreement, the Parties agree to first attempt to resolve the dispute through good faith negotiation.</p>
-                    </div>
-                     {data.location && (
-                        <div>
-                            <h3 className="font-bold text-sm text-foreground mb-1 flex justify-between items-center">
-                                5. Governing Law <Button variant="ghost" size="sm" onClick={() => onEdit(4)}>Edit</Button>
-                            </h3>
-                            <p>This Agreement shall be governed by and construed in accordance with the laws of {data.location}, without regard to its conflict of laws principles.</p>
-                        </div>
-                     )}
-                     <div>
-                         <h3 className="font-bold text-sm text-foreground mb-1">6. Entire Agreement</h3>
-                         <p>This document constitutes the entire Agreement between the Parties regarding the subject matter herein and supersedes all prior discussions, negotiations, and agreements, whether oral or written.</p>
-                     </div>
-                </section>
-
-                <Separator />
-
-                <section>
-                     <h3 className="font-bold text-base mb-2">7. Signatures</h3>
-                     <p className="text-xs text-muted-foreground mb-4">By signing below, the Parties acknowledge that they have read, understood, and agree to the terms and conditions set forth in this Simple Agreement.</p>
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4">
-                         <div>
-                             <div className="mt-8 border-b pb-1">
-                                <p className="font-semibold">{data.offerorName}</p>
-                             </div>
-                             <p className="text-xs text-muted-foreground">Party A Signature</p>
-                         </div>
-                         <div>
-                             <div className="mt-8 border-b pb-1">
-                                <p className="text-muted-foreground italic">Awaiting signature...</p>
-                             </div>
-                             <p className="text-xs text-muted-foreground">Party B Signature</p>
-                         </div>
-                     </div>
-                </section>
-            </CardContent>
-        </Card>
-    );
-}
-
 
 const ReviewStep = ({ onEdit }: { onEdit: (step: number) => void }) => {
     const { getValues } = useFormContext<OfferFormData>();
