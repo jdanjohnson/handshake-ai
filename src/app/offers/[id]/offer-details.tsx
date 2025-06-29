@@ -20,7 +20,7 @@ export function OfferDetails({ offer: initialOffer }: { offer: Offer }) {
     setIsShaking(true);
     setTimeout(() => {
         startTransition(async () => {
-            const result = await acceptOffer(offer.id, offer.offereeEmail);
+            const result = await acceptOffer(offer.id, offer.offerees[0]?.email || '');
             if (result.success) {
                 toast({
                     title: 'Agreement Sealed!',
@@ -44,6 +44,7 @@ export function OfferDetails({ offer: initialOffer }: { offer: Offer }) {
 
   const isAccepted = offer.status === 'accepted';
   const acceptedDate = offer.acceptedAt ? new Date(offer.acceptedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
+  const offereeTitle = offer.offerees.length > 1 ? "OFFEREES (TO)" : "OFFEREE (TO)";
 
   return (
     <Card className="overflow-hidden">
@@ -61,10 +62,14 @@ export function OfferDetails({ offer: initialOffer }: { offer: Offer }) {
                 <p className="flex items-center gap-2"><User className="w-4 h-4" /> {offer.offerorName}</p>
                 <p className="flex items-center gap-2"><Mail className="w-4 h-4" /> {offer.offerorEmail}</p>
             </div>
-             <div className="space-y-2">
-                <h3 className="font-semibold text-muted-foreground">OFFEREE (TO)</h3>
-                <p className="flex items-center gap-2"><User className="w-4 h-4" /> {offer.offereeName}</p>
-                <p className="flex items-center gap-2"><Mail className="w-4 h-4" /> {offer.offereeEmail}</p>
+             <div className="space-y-4">
+                <h3 className="font-semibold text-muted-foreground">{offereeTitle}</h3>
+                {offer.offerees.map((offeree, index) => (
+                    <div key={index} className="space-y-2">
+                        <p className="flex items-center gap-2"><User className="w-4 h-4" /> {offeree.name}</p>
+                        <p className="flex items-center gap-2"><Mail className="w-4 h-4" /> {offeree.email}</p>
+                    </div>
+                ))}
             </div>
         </div>
         <Separator />

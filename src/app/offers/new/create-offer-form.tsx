@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition, type ReactNode, useEffect } from 'react';
-import { useForm, FormProvider, Controller, useFormContext } from 'react-hook-form';
+import { useForm, FormProvider, Controller, useFormContext, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { createOffer, checkCompleteness } from '@/lib/actions';
@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Handshake, Users, FileText, MapPin, Search, CheckCircle, Copy, Loader2, ArrowLeft, ArrowRight, Lightbulb, ShieldCheck, AlertTriangle, PartyPopper } from 'lucide-react';
+import { Handshake, Users, FileText, MapPin, Search, CheckCircle, Copy, Loader2, ArrowLeft, ArrowRight, Lightbulb, ShieldCheck, AlertTriangle, PartyPopper, Plus, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Offer } from '@/lib/data';
 import type { AgreementCompletenessCheckOutput } from '@/ai/flows/agreement-completeness-check';
@@ -25,8 +25,10 @@ const offerSchema = z.object({
     customAgreementType: z.string().optional(),
     offerorName: z.string().min(2, { message: "Your name must be at least 2 characters." }),
     offerorEmail: z.string().email({ message: "Please enter a valid email for yourself." }),
-    offereeName: z.string().min(2, { message: "Their name must be at least 2 characters." }),
-    offereeEmail: z.string().email({ message: "Please enter a valid email for them." }),
+    offerees: z.array(z.object({
+        name: z.string().min(2, { message: "Name must be at least 2 characters." }),
+        email: z.string().email({ message: "Please enter a valid email." }),
+    })).min(1, { message: "At least one other party is required." }),
     terms: z.string().min(20, { message: "Terms must be at least 20 characters." }),
     location: z.string().optional(),
 }).refine(data => {
@@ -44,7 +46,7 @@ type FieldName = keyof OfferFormData;
 
 const steps = [
     { id: 1, name: 'Agreement Type', fields: ['agreementType', 'customAgreementType'], icon: Handshake },
-    { id: 2, name: 'Parties', fields: ['offerorName', 'offerorEmail', 'offereeName', 'offereeEmail'], icon: Users },
+    { id: 2, name: 'Parties', fields: ['offerorName', 'offerorEmail', 'offerees'], icon: Users },
     { id: 3, name: 'Terms', fields: ['terms'], icon: FileText },
     { id: 4, name: 'Location', fields: ['location'], icon: MapPin },
     { id: 5, name: 'Review', fields: [], icon: Search },
@@ -99,7 +101,12 @@ const AgreementTypeStep = () => {
 };
 
 const PartiesStep = () => {
-    const { register, formState: { errors } } = useFormContext<OfferFormData>();
+    const { register, control, formState: { errors } } = useFormContext<OfferFormData>();
+    const { fields, append, remove } = useFieldArray({
+        control,
+        name: "offerees"
+    });
+
     return (
         <FormStep title="Who's shaking hands?" description="Tell us who's making the offer and who's receiving it.">
             <Card>
@@ -121,20 +128,37 @@ const PartiesStep = () => {
             </Card>
             <Card>
                 <CardHeader>
-                    <CardTitle className="text-lg">The Other Party (The Offeree)</CardTitle>
+                    <CardTitle className="text-lg">The Other Parties (The Offerees)</CardTitle>
                 </CardHeader>
-                <CardContent className="grid sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="offereeName">Their Name</Label>
-                        <Input id="offereeName" {...register('offereeName')} placeholder="Bob Johnson" />
-                        {errors.offereeName && <p className="text-sm font-medium text-destructive">{errors.offereeName.message}</p>}
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="offereeEmail">Their Email</Label>
-                        <Input id="offereeEmail" type="email" {...register('offereeEmail')} placeholder="bob@example.com" />
-                        {errors.offereeEmail && <p className="text-sm font-medium text-destructive">{errors.offereeEmail.message}</p>}
-                    </div>
+                <CardContent className="space-y-4">
+                    {fields.map((field, index) => (
+                        <div key={field.id} className="p-4 border rounded-md space-y-4 bg-muted/50 relative">
+                             {fields.length > 1 && (
+                                <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2 text-muted-foreground hover:text-destructive" onClick={() => remove(index)}>
+                                    <Trash2 className="w-4 h-4" />
+                                </Button>
+                            )}
+                            <div className="grid sm:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor={`offerees.${index}.name`}>Their Name</Label>
+                                    <Input id={`offerees.${index}.name`} {...register(`offerees.${index}.name`)} placeholder="Bob Johnson" />
+                                    {errors.offerees?.[index]?.name && <p className="text-sm font-medium text-destructive">{errors.offerees?.[index]?.name?.message}</p>}
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor={`offerees.${index}.email`}>Their Email</Label>
+                                    <Input id={`offerees.${index}.email`} type="email" {...register(`offerees.${index}.email`)} placeholder="bob@example.com" />
+                                    {errors.offerees?.[index]?.email && <p className="text-sm font-medium text-destructive">{errors.offerees?.[index]?.email?.message}</p>}
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                     {errors.offerees?.root && <p className="text-sm font-medium text-destructive">{errors.offerees.root.message}</p>}
                 </CardContent>
+                <CardFooter>
+                     <Button type="button" variant="outline" onClick={() => append({ name: "", email: "" })}>
+                        <Plus className="mr-2" /> Add Another Party
+                    </Button>
+                </CardFooter>
             </Card>
         </FormStep>
     );
@@ -244,9 +268,16 @@ const ReviewStep = ({ onEdit }: { onEdit: (step: number) => void }) => {
                             <h4 className="font-semibold text-muted-foreground">PARTIES</h4>
                             <Button variant="ghost" size="sm" onClick={() => onEdit(2)}>Edit</Button>
                         </div>
-                        <div className="text-sm">
+                        <div className="text-sm space-y-2">
                             <p><strong>From:</strong> {data.offerorName} ({data.offerorEmail})</p>
-                            <p><strong>To:</strong> {data.offereeName} ({data.offereeEmail})</p>
+                            <div>
+                                <strong>To:</strong>
+                                <ul className="list-disc pl-5">
+                                {data.offerees.map((offeree, index) => (
+                                    <li key={index}>{offeree.name} ({offeree.email})</li>
+                                ))}
+                                </ul>
+                            </div>
                         </div>
                     </div>
                     <div className="pt-2">
@@ -283,7 +314,10 @@ const SuccessStep = ({ offer, onReset }: { offer: Offer, onReset: () => void }) 
     const [offerUrl, setOfferUrl] = useState('');
 
     useEffect(() => {
-        setOfferUrl(`${window.location.origin}/offers/${offer.id}`);
+        // window is only available on the client
+        if (typeof window !== 'undefined') {
+          setOfferUrl(`${window.location.origin}/offers/${offer.id}`);
+        }
     }, [offer.id]);
     
     const copyToClipboard = (text: string) => {
@@ -331,6 +365,15 @@ export function CreateOfferForm() {
 
     const methods = useForm<OfferFormData>({
         resolver: zodResolver(offerSchema),
+        defaultValues: {
+            offerorName: '',
+            offerorEmail: '',
+            offerees: [{ name: '', email: '' }],
+            terms: '',
+            location: '',
+            agreementType: '',
+            customAgreementType: '',
+        }
     });
 
     const { trigger, handleSubmit, reset } = methods;

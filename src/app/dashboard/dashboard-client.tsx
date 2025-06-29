@@ -29,36 +29,43 @@ function OfferList({ offers, title, loggedInEmail }: { offers: Offer[]; title: s
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {offers.map((offer) => (
-                <Card key={offer.id} className="flex flex-col">
-                    <CardHeader>
-                        <CardTitle className="truncate">{offer.title}</CardTitle>
-                        <CardDescription>
-                            With {offer.offerorEmail.toLowerCase() === loggedInEmail?.toLowerCase() ? offer.offereeName : offer.offerorName}
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="flex-grow">
-                        <div className="flex items-center gap-2 text-sm">
-                            {offer.status === 'accepted' ? (
-                                <CheckCircle2 className="w-4 h-4 text-green-500" />
-                            ) : (
-                                <Clock className="w-4 h-4 text-yellow-500" />
-                            )}
-                            <span className="capitalize">{offer.status}</span>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-2">
-                            Created on {new Date(offer.createdAt).toLocaleDateString()}
-                        </p>
-                    </CardContent>
-                    <CardFooter>
-                        <Button asChild variant="secondary" className="w-full">
-                            <Link href={`/offers/${offer.id}`}>
-                                View Details <ArrowUpRight className="w-4 h-4 ml-2" />
-                            </Link>
-                        </Button>
-                    </CardFooter>
-                </Card>
-            ))}
+            {offers.map((offer) => {
+                const isSentByMe = offer.offerorEmail.toLowerCase() === loggedInEmail?.toLowerCase();
+                const withParty = isSentByMe 
+                    ? offer.offerees.map(o => o.name).join(', ') 
+                    : offer.offerorName;
+
+                return (
+                    <Card key={offer.id} className="flex flex-col">
+                        <CardHeader>
+                            <CardTitle className="truncate">{offer.title}</CardTitle>
+                            <CardDescription>
+                                With {withParty}
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="flex-grow">
+                            <div className="flex items-center gap-2 text-sm">
+                                {offer.status === 'accepted' ? (
+                                    <CheckCircle2 className="w-4 h-4 text-green-500" />
+                                ) : (
+                                    <Clock className="w-4 h-4 text-yellow-500" />
+                                )}
+                                <span className="capitalize">{offer.status}</span>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-2">
+                                Created on {new Date(offer.createdAt).toLocaleDateString()}
+                            </p>
+                        </CardContent>
+                        <CardFooter>
+                            <Button asChild variant="secondary" className="w-full">
+                                <Link href={`/offers/${offer.id}`}>
+                                    View Details <ArrowUpRight className="w-4 h-4 ml-2" />
+                                </Link>
+                            </Button>
+                        </CardFooter>
+                    </Card>
+                );
+            })}
         </div>
     )
 }
@@ -110,7 +117,7 @@ export function DashboardClient() {
                     <CardHeader>
                         <CardTitle>Access Your Dashboard</CardTitle>
                         <CardDescription>
-                            Enter your email to view your agreements. In a real app, this would send you a secure magic link.
+                            Enter your email to view your handshakes. In a real app, this would send you a secure magic link.
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -135,7 +142,7 @@ export function DashboardClient() {
     }
 
     const sentOffers = offers.filter((o) => o.offerorEmail.toLowerCase() === loggedInEmail.toLowerCase());
-    const receivedOffers = offers.filter((o) => o.offereeEmail.toLowerCase() === loggedInEmail.toLowerCase());
+    const receivedOffers = offers.filter((o) => o.offerees.some(offeree => offeree.email.toLowerCase() === loggedInEmail.toLowerCase()));
     
     return (
         <div>

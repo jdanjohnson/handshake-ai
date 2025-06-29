@@ -1,14 +1,18 @@
 // In a real application, this would be a database.
 // For this example, we're using an in-memory array.
 
+export type Offeree = {
+  name: string;
+  email: string;
+};
+
 export type Offer = {
   id: string;
   title: string;
   terms: string;
   offerorName: string;
   offerorEmail: string;
-  offereeName: string;
-  offereeEmail: string;
+  offerees: Offeree[];
   status: 'pending' | 'accepted';
   createdAt: Date;
   acceptedAt: Date | null;
@@ -21,8 +25,7 @@ const offers: Offer[] = [
         terms: 'Create 3 logo concepts for a new startup. One final logo will be chosen with up to 3 revision rounds. Final assets delivered in SVG and PNG formats.',
         offerorName: 'Jadan',
         offerorEmail: 'iamjadan@gmail.com',
-        offereeName: 'Creative Co.',
-        offereeEmail: 'design@creative.co',
+        offerees: [{ name: 'Creative Co.', email: 'design@creative.co' }],
         status: 'pending',
         createdAt: new Date(new Date().setDate(new Date().getDate() - 1)),
         acceptedAt: null,
@@ -33,8 +36,7 @@ const offers: Offer[] = [
         terms: 'Provide 10 hours of marketing consulting over the next month. Focus on social media strategy and content planning. Billed at $150/hour.',
         offerorName: 'Jadan',
         offerorEmail: 'iamjadan@gmail.com',
-        offereeName: 'Startup Inc.',
-        offereeEmail: 'contact@startup.inc',
+        offerees: [{ name: 'Startup Inc.', email: 'contact@startup.inc' }],
         status: 'accepted',
         createdAt: new Date(new Date().setDate(new Date().getDate() - 20)),
         acceptedAt: new Date(new Date().setDate(new Date().getDate() - 18)),
@@ -45,8 +47,7 @@ const offers: Offer[] = [
         terms: '12-month lease for apartment #4B at 123 Main St. Rent is $2000/month, due on the 1st. Security deposit of $2000 required. No pets allowed. Tenant responsible for utilities.',
         offerorName: 'City Apartments',
         offerorEmail: 'leasing@cityapts.com',
-        offereeName: 'Jadan',
-        offereeEmail: 'iamjadan@gmail.com',
+        offerees: [{ name: 'Jadan', email: 'iamjadan@gmail.com' }],
         status: 'pending',
         createdAt: new Date(new Date().setDate(new Date().getDate() - 2)),
         acceptedAt: null,
@@ -57,8 +58,7 @@ const offers: Offer[] = [
         terms: 'Write four 1000-word blog posts on the topic of sustainable travel. SEO keywords will be provided. All articles must be original and pass plagiarism checks. Delivery schedule: one article per week.',
         offerorName: 'Content Factory',
         offerorEmail: 'editor@contentfactory.com',
-        offereeName: 'Jadan',
-        offereeEmail: 'iamjadan@gmail.com',
+        offerees: [{ name: 'Jadan', email: 'iamjadan@gmail.com' }],
         status: 'accepted',
         createdAt: new Date(new Date().setDate(new Date().getDate() - 10)),
         acceptedAt: new Date(new Date().setDate(new Date().getDate() - 8)),
@@ -67,7 +67,7 @@ const offers: Offer[] = [
 
 export async function getOffersByEmail(email: string) {
   return offers.filter(
-    (offer) => offer.offerorEmail.toLowerCase() === email.toLowerCase() || offer.offereeEmail.toLowerCase() === email.toLowerCase()
+    (offer) => offer.offerorEmail.toLowerCase() === email.toLowerCase() || offer.offerees.some(offeree => offeree.email.toLowerCase() === email.toLowerCase())
   ).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 }
 

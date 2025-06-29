@@ -10,8 +10,10 @@ const offerSchema = z.object({
     customAgreementType: z.string().optional(),
     offerorName: z.string().min(2, 'Your name is required'),
     offerorEmail: z.string().email('A valid email for you is required'),
-    offereeName: z.string().min(2, 'Their name is required'),
-    offereeEmail: z.string().email('A valid email for them is required'),
+    offerees: z.array(z.object({
+        name: z.string().min(2, { message: "Name must be at least 2 characters." }),
+        email: z.string().email({ message: "Please enter a valid email." }),
+    })).min(1, { message: "At least one other party is required." }),
     terms: z.string().min(20, 'Agreement terms must be at least 20 characters'),
     location: z.string().optional(),
 }).refine(data => {
