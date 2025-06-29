@@ -23,7 +23,7 @@ export default function Home() {
           </Button>
           <Button asChild variant="secondary" size="lg">
             <Link href="/dashboard">
-              <LayoutDashboard className="mr-2" /> View My Agreements
+              <LayoutDashboard className="mr-2" /> View My Handshakes
             </Link>
           </Button>
         </div>

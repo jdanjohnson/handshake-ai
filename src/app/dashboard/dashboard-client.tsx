@@ -9,18 +9,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Link from "next/link";
-import { ArrowUpRight, CheckCircle2, Clock, Inbox } from "lucide-react";
+import { ArrowUpRight, CheckCircle2, Clock, FilePlus2, Inbox } from "lucide-react";
 
-function OfferList({ offers, title }: { offers: Offer[]; title: string }) {
+function OfferList({ offers, title, loggedInEmail }: { offers: Offer[]; title: string; loggedInEmail: string | null }) {
     if (offers.length === 0) {
         return (
             <div className="text-center py-12 border-2 border-dashed rounded-lg">
                 <Inbox className="mx-auto h-12 w-12 text-muted-foreground" />
-                <h3 className="mt-2 text-sm font-semibold text-foreground">No Offers Found</h3>
-                <p className="mt-1 text-sm text-muted-foreground">You have no {title.toLowerCase()} offers.</p>
+                <h3 className="mt-2 text-sm font-semibold text-foreground">No Handshakes Found</h3>
+                <p className="mt-1 text-sm text-muted-foreground">You haven't {title.toLowerCase()} any handshakes yet.</p>
                  {title === "Sent" && (
                     <Button asChild className="mt-6">
-                        <Link href="/offers/new">Create an Offer</Link>
+                        <Link href="/offers/new">Create a Handshake</Link>
                     </Button>
                  )}
             </div>
@@ -34,7 +34,7 @@ function OfferList({ offers, title }: { offers: Offer[]; title: string }) {
                     <CardHeader>
                         <CardTitle className="truncate">{offer.title}</CardTitle>
                         <CardDescription>
-                            With {offer.offerorEmail === document.querySelector<HTMLInputElement>('#email')?.value ? offer.offereeName : offer.offerorName}
+                            With {offer.offerorEmail.toLowerCase() === loggedInEmail?.toLowerCase() ? offer.offereeName : offer.offerorName}
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="flex-grow">
@@ -126,7 +126,7 @@ export function DashboardClient() {
                                     required
                                 />
                             </div>
-                            <Button type="submit" className="w-full">View My Agreements</Button>
+                            <Button type="submit" className="w-full">View My Handshakes</Button>
                         </form>
                     </CardContent>
                 </Card>
@@ -140,11 +140,18 @@ export function DashboardClient() {
     return (
         <div>
             <div className="flex justify-between items-center mb-6">
-                <p>Viewing agreements for: <span className="font-semibold">{loggedInEmail}</span></p>
+                <p>Viewing handshakes for: <span className="font-semibold">{loggedInEmail}</span></p>
                 <Button variant="outline" onClick={handleLogout}>Change Email</Button>
             </div>
+             <div className="block md:hidden mb-6">
+                <Button asChild className="w-full" size="lg">
+                    <Link href="/offers/new">
+                        <FilePlus2 className="mr-2" /> New Handshake
+                    </Link>
+                </Button>
+            </div>
             {isLoading ? (
-                <p>Loading agreements...</p>
+                <p>Loading handshakes...</p>
             ) : (
                 <Tabs defaultValue="received">
                     <TabsList className="grid w-full grid-cols-2 md:w-[400px]">
@@ -152,10 +159,10 @@ export function DashboardClient() {
                         <TabsTrigger value="sent">Sent ({sentOffers.length})</TabsTrigger>
                     </TabsList>
                     <TabsContent value="received" className="mt-6">
-                        <OfferList offers={receivedOffers} title="Received" />
+                        <OfferList offers={receivedOffers} title="Received" loggedInEmail={loggedInEmail}/>
                     </TabsContent>
                     <TabsContent value="sent" className="mt-6">
-                        <OfferList offers={sentOffers} title="Sent" />
+                        <OfferList offers={sentOffers} title="Sent" loggedInEmail={loggedInEmail}/>
                     </TabsContent>
                 </Tabs>
             )}
