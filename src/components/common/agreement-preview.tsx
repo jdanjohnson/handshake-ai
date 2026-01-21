@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import type { Offer } from '@/lib/data';
 import type { OfferFormData } from '@/app/offers/new/create-offer-form';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,7 +17,13 @@ function isOffer(data: AgreementData): data is Offer {
 }
 
 export function AgreementPreview({ data, onEdit }: { data: AgreementData, onEdit?: (step: number) => void }) {
-    const agreementDate = isOffer(data) && data.createdAt ? new Date(data.createdAt).toLocaleDateString() : new Date().toLocaleDateString();
+    const [agreementDate, setAgreementDate] = useState('');
+
+    useEffect(() => {
+        const dateString = isOffer(data) && data.createdAt ? new Date(data.createdAt).toLocaleDateString() : new Date().toLocaleDateString();
+        setAgreementDate(dateString);
+    }, [data]);
+
     const title = isOffer(data) ? data.title : (data.agreementType === 'Other' && data.customAgreementType ? data.customAgreementType : data.agreementType);
     const offereeTitle = (data.offerees?.length || 0) > 1 ? "PARTIES (B)" : "PARTY (B)";
 
