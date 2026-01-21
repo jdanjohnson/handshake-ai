@@ -1,0 +1,26 @@
+{
+    "default": {
+        "src": "https://picsum.photos/seed/default/100/100",
+        "hint": "abstract texture"
+    },
+    "creative-project": {
+        "src": "https://picsum.photos/seed/creative/100/100",
+        "hint": "art document"
+    },
+    "equipment-rental": {
+        "src": "https://picsum.photos/seed/equipment/100/100",
+        "hint": "empty room"
+    },
+    "consulting-agreement": {
+        "src": "https://picsum.photos/seed/consulting/100/100",
+        "hint": "green texture"
+    },
+    "lease-agreement": {
+        "src": "https://picsum.photos/seed/lease/100/100",
+        "hint": "apartment building"
+    },
+    "writing-contract": {
+        "src": "https://picsum.photos/seed/writing/100/100",
+        "hint": "notebook pen"
+    }
+}

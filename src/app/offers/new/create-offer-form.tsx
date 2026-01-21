@@ -4,7 +4,8 @@ import { useState, useTransition, type ReactNode, useEffect } from 'react';
 import { useForm, FormProvider, Controller, useFormContext, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { createOffer, checkCompleteness } from '@/lib/actions';
+import { useSearchParams } from 'next/navigation';
+import { createOffer, checkCompleteness, getOffer } from '@/lib/actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -379,7 +380,7 @@ const SuccessStep = ({ offer, onReset }: { offer: Offer, onReset: () => void }) 
 
             <div className="flex flex-col sm:flex-row justify-center gap-4 mt-8">
                 <Button asChild size="lg">
-                    <Link href="/dashboard">Go to Dashboard</Link>
+                    <Link href="/">Go to Home</Link>
                 </Button>
                 <Button size="lg" variant="outline" onClick={onReset}>Create Another Agreement</Button>
             </div>
@@ -389,30 +390,56 @@ const SuccessStep = ({ offer, onReset }: { offer: Offer, onReset: () => void }) 
 
 // --- Main Form Component ---
 
+function useCreateOfferForm() {
+    const searchParams = useSearchParams();
+    const draftId = searchParams.get('id');
+
+    const defaultValues: OfferFormData = {
+        offerorName: '',
+        offerorEmail: '',
+        offerees: [{ name: '', email: '' }],
+        terms: '',
+        specificTerms: [],
+        paymentAmount: '',
+        paymentDueDate: '',
+        paymentMethod: '',
+        duration: '',
+        location: '',
+        agreementType: '',
+        customAgreementType: '',
+    };
+    
+    const methods = useForm<OfferFormData>({
+        resolver: zodResolver(offerSchema),
+        defaultValues,
+    });
+
+    useEffect(() => {
+        if (draftId) {
+            getOffer(draftId).then(offer => {
+                if (offer && offer.status === 'draft') {
+                    const { title, ...rest } = offer;
+                    methods.reset({
+                        ...defaultValues,
+                        ...rest,
+                        agreementType: title, // This is a simplification
+                    });
+                }
+            });
+        }
+    }, [draftId, methods]);
+    
+    return methods;
+}
+
+
 export function CreateOfferForm() {
     const [currentStep, setCurrentStep] = useState(1);
     const [isPending, startTransition] = useTransition();
     const { toast } = useToast();
     const [createdOffer, setCreatedOffer] = useState<Offer | null>(null);
 
-    const methods = useForm<OfferFormData>({
-        resolver: zodResolver(offerSchema),
-        defaultValues: {
-            offerorName: '',
-            offerorEmail: '',
-            offerees: [{ name: '', email: '' }],
-            terms: '',
-            specificTerms: [],
-            paymentAmount: '',
-            paymentDueDate: '',
-            paymentMethod: '',
-            duration: '',
-            location: '',
-            agreementType: '',
-            customAgreementType: '',
-        }
-    });
-
+    const methods = useCreateOfferForm();
     const { trigger, handleSubmit, reset } = methods;
 
     const nextStep = async () => {

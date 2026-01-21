@@ -1,7 +1,7 @@
 'use server';
 
 import { z } from 'zod';
-import { addOffer, updateOfferStatus } from './data';
+import { addOffer, updateOfferStatus, getOfferById } from './data';
 import { revalidatePath } from 'next/cache';
 import { agreementCompletenessCheck } from '@/ai/flows/agreement-completeness-check';
 
@@ -51,7 +51,7 @@ export async function createOffer(data: unknown) {
         const title = agreementType === 'Other' && customAgreementType ? customAgreementType : agreementType;
 
         const newOffer = await addOffer({ ...rest, title });
-        revalidatePath('/dashboard');
+        revalidatePath('/');
         revalidatePath(`/offers/${newOffer.id}`);
 
         return { success: true, offer: newOffer };
@@ -71,7 +71,7 @@ export async function acceptOffer(offerId: string, offereeEmail: string) {
         if (!updatedOffer) {
             throw new Error("Offer not found.");
         }
-        revalidatePath('/dashboard');
+        revalidatePath('/');
         revalidatePath(`/offers/${offerId}`);
         return { success: true, message: 'Offer accepted!' };
     } catch (error) {
@@ -90,4 +90,8 @@ export async function checkCompleteness(terms: string) {
         console.error(e);
         return { error: "An unexpected error occurred while checking the agreement." }
     }
+}
+
+export async function getOffer(id: string) {
+    return await getOfferById(id);
 }

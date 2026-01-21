@@ -24,19 +24,21 @@ export type Offer = {
   offerorName: string;
   offerorEmail: string;
   offerees: Offeree[];
-  status: 'pending' | 'accepted';
+  status: 'pending' | 'accepted' | 'draft';
   createdAt: Date;
   acceptedAt: Date | null;
+  imageUrl: string;
 };
 
-const offers: Offer[] = [
+// Renamed to avoid conflicts if you choose to fetch later.
+export const mockOffers: Offer[] = [
     {
-        id: 'jadan-sent-1',
-        title: 'Graphic Design for Logo',
+        id: 'creative-collab-1',
+        title: 'Creative Project Collab',
         terms: 'Create 3 logo concepts for a new startup. One final logo will be chosen with up to 3 revision rounds. Final assets delivered in SVG and PNG formats.',
         offerorName: 'Jadan',
         offerorEmail: 'iamjadan@gmail.com',
-        offerees: [{ name: 'Creative Co.', email: 'design@creative.co' }],
+        offerees: [{ name: 'Sarah Jenkins', email: 'design@creative.co' }],
         status: 'pending',
         createdAt: new Date(new Date().setDate(new Date().getDate() - 1)),
         acceptedAt: null,
@@ -48,22 +50,37 @@ const offers: Offer[] = [
         ],
         paymentAmount: '$1,200',
         paymentDueDate: 'Upon final delivery',
-        paymentMethod: 'Bank Transfer'
+        paymentMethod: 'Bank Transfer',
+        imageUrl: 'creative-project'
     },
     {
-        id: 'jadan-sent-2',
-        title: 'Consulting Services Agreement',
+        id: 'equipment-rental-2',
+        title: 'Equipment Rental',
         terms: 'Provide 10 hours of marketing consulting over the next month. Focus on social media strategy and content planning. Billed at $150/hour.',
-        offerorName: 'Jadan',
-        offerorEmail: 'iamjadan@gmail.com',
-        offerees: [{ name: 'Startup Inc.', email: 'contact@startup.inc' }],
+        offerorName: 'Mike Ross',
+        offerorEmail: 'mike@ross.com',
+        offerees: [{ name: 'Jadan', email: 'iamjadan@gmail.com' }],
         status: 'accepted',
         createdAt: new Date(new Date().setDate(new Date().getDate() - 20)),
         acceptedAt: new Date(new Date().setDate(new Date().getDate() - 18)),
-        duration: '1 month from start date.'
+        duration: '1 month from start date.',
+        imageUrl: 'equipment-rental'
     },
     {
-        id: 'jadan-received-1',
+        id: 'consulting-agreement-3',
+        title: 'Consulting Agreement',
+        terms: 'Consulting services for Q3.',
+        offerorName: 'Jessica Pearson',
+        offerorEmail: 'jessica@pearson.com',
+        offerees: [{ name: 'Jadan', email: 'iamjadan@gmail.com' }],
+        status: 'draft',
+        createdAt: new Date(new Date().setDate(new Date().getDate() - 30)),
+        acceptedAt: null,
+        location: 'Chicago, IL',
+        imageUrl: 'consulting-agreement'
+    },
+    {
+        id: 'lease-agreement-4',
         title: 'Apartment Lease Agreement',
         terms: '12-month lease for apartment #4B at 123 Main St. Rent is $2000/month, due on the 1st. Security deposit of $2000 required. No pets allowed. Tenant responsible for utilities.',
         offerorName: 'City Apartments',
@@ -72,10 +89,11 @@ const offers: Offer[] = [
         status: 'pending',
         createdAt: new Date(new Date().setDate(new Date().getDate() - 2)),
         acceptedAt: null,
-        location: '123 Main St, Anytown, USA'
+        location: '123 Main St, Anytown, USA',
+        imageUrl: 'lease-agreement'
     },
     {
-        id: 'jadan-received-2',
+        id: 'writing-contract-5',
         title: 'Freelance Writing Contract',
         terms: 'Write four 1000-word blog posts on the topic of sustainable travel. SEO keywords will be provided. All articles must be original and pass plagiarism checks. Delivery schedule: one article per week.',
         offerorName: 'Content Factory',
@@ -84,8 +102,11 @@ const offers: Offer[] = [
         status: 'accepted',
         createdAt: new Date(new Date().setDate(new Date().getDate() - 10)),
         acceptedAt: new Date(new Date().setDate(new Date().getDate() - 8)),
+        imageUrl: 'writing-contract'
     },
 ];
+
+let offers = [...mockOffers]; // Create a mutable copy
 
 export async function getOffersByEmail(email: string) {
   return offers.filter(
@@ -97,13 +118,14 @@ export async function getOfferById(id: string) {
   return offers.find((offer) => offer.id === id) || null;
 }
 
-export async function addOffer(offerData: Omit<Offer, 'id' | 'status' | 'createdAt' | 'acceptedAt'>) {
+export async function addOffer(offerData: Omit<Offer, 'id' | 'status' | 'createdAt' | 'acceptedAt' | 'imageUrl'>) {
     const newOffer: Offer = {
         ...offerData,
         id: (Math.random() + 1).toString(36).substring(2),
         status: 'pending',
         createdAt: new Date(),
         acceptedAt: null,
+        imageUrl: 'default',
     };
     offers.unshift(newOffer);
     return newOffer;

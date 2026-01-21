@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { cn } from '@/lib/utils';
 import { Toaster } from '@/components/ui/toaster';
-import Header from '@/components/common/header';
+import BottomNav from '@/components/common/bottom-nav';
 
 export const metadata: Metadata = {
   title: 'Handshake Legal',
@@ -24,9 +24,9 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className={cn('font-body antialiased min-h-screen flex flex-col')}>
-        <Header />
-        <main className="flex-grow">{children}</main>
+      <body className={cn('font-body antialiased min-h-screen flex flex-col bg-background')}>
+        <main className="flex-grow pb-20">{children}</main>
+        <BottomNav />
         <Toaster />
       </body>
     </html>
