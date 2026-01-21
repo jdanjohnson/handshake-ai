@@ -7,7 +7,7 @@ import { Bell, Settings, Search, Calendar, User, Plus } from 'lucide-react';
 
 import type { Offer } from '@/lib/data';
 import { mockOffers } from '@/lib/data'; // Using static mock data
-import { placeholderImages } from '@/lib/placeholder-images';
+import placeholderImages from '@/app/lib/placeholder-images.json';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
