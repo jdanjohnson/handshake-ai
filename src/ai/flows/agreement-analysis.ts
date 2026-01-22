@@ -46,37 +46,39 @@ export type AgreementAnalysisOutput = z.infer<
   typeof AgreementAnalysisOutputSchema
 >;
 
-const MOCK_CAMERA_ANALYSIS: AgreementAnalysisOutput = {
-    score: 82,
-    summary: "This agreement is clear and fair, but could be improved by adding a specific return date and clarifying the condition of the camera upon return.",
-    recommendations: [
-        {
-            title: "Add a specific return date",
-            description: "The agreement mentions a loan period of 'about a week'. Specifying an exact date (e.g., October 24, 2024) will prevent any confusion.",
-            type: "improvement",
-        },
-        {
-            title: "Define consequences for damage",
-            description: "Consider adding a clause that outlines who is responsible for repair costs if the camera is damaged during the loan period.",
-            type: "improvement",
-        },
-        {
-            title: "Scope of use is clear",
-            description: "The agreement clearly states the camera is for personal use during a vacation, which is a great, specific detail.",
-            type: "positive",
-        },
-    ]
-};
+const analysisPrompt = ai.definePrompt({
+  name: 'agreementAnalysisPrompt',
+  input: { schema: AgreementAnalysisInputSchema },
+  output: { schema: AgreementAnalysisOutputSchema },
+  prompt: `You are a helpful legal assistant. Your goal is to analyze a simple agreement text for potential issues, providing a "legal health" score and actionable recommendations.
 
+  Analyze the following agreement text for its fairness, clarity, and completeness.
+  
+  - Provide a score from 0-100 representing the overall quality of the agreement. A higher score means the agreement is clearer, fairer, and more complete.
+  - Provide a one-sentence conversational summary of your analysis results.
+  - Provide a list of specific recommendations. These can be areas for 'improvement' (like vague language or missing terms) or 'positive' aspects (like clear and fair terms).
+  
+  Here is the agreement text:
+  
+  '''
+  {{{agreementText}}}
+  '''`,
+});
+
+const analysisFlow = ai.defineFlow(
+  {
+    name: 'agreementAnalysisFlow',
+    inputSchema: AgreementAnalysisInputSchema,
+    outputSchema: AgreementAnalysisOutputSchema,
+  },
+  async (input) => {
+    const { output } = await analysisPrompt(input);
+    return output!;
+  }
+);
 
 export async function analyzeAgreement(
   input: AgreementAnalysisInput
 ): Promise<AgreementAnalysisOutput> {
-  // This is a mock implementation that simulates an AI call
-  console.log("Analyzing agreement with mock data:", input.agreementText);
-
-  // Simulate network delay
-  await new Promise(resolve => setTimeout(resolve, 1500));
-
-  return MOCK_CAMERA_ANALYSIS;
+  return analysisFlow(input);
 }

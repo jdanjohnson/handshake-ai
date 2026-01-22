@@ -53,9 +53,6 @@ export default function Home() {
                         <p className="text-sm font-medium text-muted-foreground">Welcome Back</p>
                         <h1 className="text-2xl font-bold">Handshake</h1>
                     </div>
-                    <Avatar>
-                        <AvatarFallback>JJ</AvatarFallback>
-                    </Avatar>
                 </div>
             </header>
 

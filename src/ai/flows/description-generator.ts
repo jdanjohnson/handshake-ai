@@ -24,19 +24,31 @@ export type DescriptionGeneratorOutput = z.infer<
   typeof DescriptionGeneratorOutputSchema
 >;
 
+const descriptionPrompt = ai.definePrompt({
+  name: 'descriptionGeneratorPrompt',
+  input: { schema: DescriptionGeneratorInputSchema },
+  output: { schema: DescriptionGeneratorOutputSchema },
+  prompt: `You are a helpful assistant who is an expert at writing simple, clear legal agreements.
+
+  Based on the provided agreement title, generate a concise, one-paragraph description for the deal. This description will serve as the starting point for a simple legal agreement.
+  
+  Focus on clarity and simplicity. The description should cover the essential purpose of the agreement.
+  
+  Agreement Title: {{{title}}}
+  `,
+});
+
+const descriptionFlow = ai.defineFlow({
+  name: 'descriptionGeneratorFlow',
+  inputSchema: DescriptionGeneratorInputSchema,
+  outputSchema: DescriptionGeneratorOutputSchema,
+}, async (input) => {
+  const { output } = await descriptionPrompt(input);
+  return output!;
+});
+
 export async function generateDescription(
   input: DescriptionGeneratorInput
 ): Promise<DescriptionGeneratorOutput> {
-  
-  // This is a mock implementation
-  console.log("Generating description for title:", input.title);
-  
-  // Simulate network delay
-  await new Promise(resolve => setTimeout(resolve, 1000));
-
-  const MOCK_CAMERA_DESCRIPTION = "This agreement covers the loan of a digital camera from Party A to Party B for personal use during a vacation. The loan period is approximately one week, and the camera is to be returned in the same condition it was received.";
-
-  return {
-    description: MOCK_CAMERA_DESCRIPTION
-  };
+  return descriptionFlow(input);
 }
