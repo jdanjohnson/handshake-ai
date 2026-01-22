@@ -10,7 +10,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import Image from 'next/image';
 import { notFound } from 'next/navigation';
 
-const DUMMY_USER_EMAIL = 'iamjadan@gmail.com';
+const DUMMY_USER_EMAIL = 'jadan.johnson@example.com';
 
 function getInitials(name: string) {
     return name.split(' ').map(n => n[0]).join('');

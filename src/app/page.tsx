@@ -9,7 +9,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import BottomNav from '@/components/common/bottom-nav';
 
-const DUMMY_USER_EMAIL = 'iamjadan@gmail.com';
+const DUMMY_USER_EMAIL = 'jadan.johnson@example.com';
 
 function getInitials(name: string) {
     return name.split(' ').map(n => n[0]).join('');
@@ -54,7 +54,7 @@ export default function Home() {
                         <h1 className="text-2xl font-bold">Handshake</h1>
                     </div>
                     <Avatar>
-                        <AvatarFallback>J</AvatarFallback>
+                        <AvatarFallback>JJ</AvatarFallback>
                     </Avatar>
                 </div>
             </header>

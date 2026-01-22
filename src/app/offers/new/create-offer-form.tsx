@@ -34,8 +34,8 @@ type OfferFormData = z.infer<typeof offerSchema>;
 type FieldName = keyof OfferFormData;
 
 const DUMMY_USER = {
-    name: 'Jadan',
-    email: 'iamjadan@gmail.com'
+    name: 'Ja\'dan Johnson',
+    email: 'jadan.johnson@example.com'
 }
 
 function getInitials(name: string) {
