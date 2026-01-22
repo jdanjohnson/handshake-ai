@@ -4,7 +4,7 @@ import { useState, useTransition, useMemo } from 'react';
 import { useForm, FormProvider, Controller, useFieldArray, useFormContext } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { createOffer, analyzeAgreementTerms } from '@/lib/actions';
+import { createOffer, analyzeAgreementTerms, generateAgreementDescription } from '@/lib/actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -57,15 +57,46 @@ const steps = [
 
 
 function Step1({ onNext }: { onNext: () => Promise<void> }) {
-    const { register, control, formState: { errors } } = useFormContext<OfferFormData>();
+    const { register, control, formState: { errors }, getValues, setValue } = useFormContext<OfferFormData>();
     const { fields, append, remove } = useFieldArray({ control, name: 'offerees' });
-    const [isPending, startTransition] = useTransition();
+    const [isNextPending, startNextTransition] = useTransition();
+    const [isGenerating, startGeneratingTransition] = useTransition();
+    const { toast } = useToast();
 
     const handleNext = () => {
-        startTransition(async () => {
+        startNextTransition(async () => {
             await onNext();
         });
-    }
+    };
+
+    const handleGenerateDescription = () => {
+        const title = getValues('title');
+        if (!title) {
+            toast({
+                title: 'Title is missing',
+                description: 'Please enter a title for your agreement first.',
+                variant: 'destructive'
+            });
+            return;
+        }
+
+        startGeneratingTransition(async () => {
+            const result = await generateAgreementDescription(title);
+            if ('description' in result) {
+                setValue('terms', result.description, { shouldValidate: true });
+                toast({
+                    title: 'Description Generated!',
+                    description: "We've created a starting point for your terms.",
+                });
+            } else {
+                toast({
+                    title: "Generation Failed",
+                    description: result.error,
+                    variant: "destructive",
+                });
+            }
+        });
+    };
 
     return (
         <div className="flex-1 space-y-8">
@@ -99,14 +130,19 @@ function Step1({ onNext }: { onNext: () => Promise<void> }) {
 
 
             <div className="flex flex-col gap-2">
-                <label className="text-foreground dark:text-gray-200 text-base font-bold">Description of the Deal</label>
+                <div className="flex justify-between items-center">
+                    <label className="text-foreground dark:text-gray-200 text-base font-bold">Description of the Deal</label>
+                    <Button type="button" variant="ghost" size="sm" onClick={handleGenerateDescription} disabled={isGenerating}>
+                        {isGenerating ? <Loader2 className="animate-spin" /> : <><Wand2 className="mr-2" /> Generate with AI</>}
+                    </Button>
+                </div>
                 <Textarea {...register('terms')} placeholder="Be clear about the deliverables and timeline. What are the core expectations for both sides?" className="min-h-[160px] rounded-xl p-4" />
                 {errors.terms && <p className="text-sm font-medium text-destructive">{errors.terms.message}</p>}
             </div>
              <div className="flex justify-end gap-4">
-                <Button onClick={handleNext} disabled={isPending} className="h-12 px-6 rounded-xl flex-[2] bg-primary text-white font-bold shadow-lg shadow-primary/20 transition-all">
-                    {isPending ? <Loader2 className="animate-spin" /> : "Next: Define Terms"}
-                    {!isPending && <ArrowRight className="ml-2 w-5 h-5" />}
+                <Button onClick={handleNext} disabled={isNextPending || isGenerating} className="h-12 px-6 rounded-xl flex-[2] bg-primary text-white font-bold shadow-lg shadow-primary/20 transition-all">
+                    {isNextPending ? <Loader2 className="animate-spin" /> : "Next: Define Terms"}
+                    {!isNextPending && <ArrowRight className="ml-2 w-5 h-5" />}
                 </Button>
             </div>
         </div>

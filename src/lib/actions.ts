@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { addOffer, updateOfferStatus, getOfferById } from './data';
 import { revalidatePath } from 'next/cache';
 import { analyzeAgreement, AgreementAnalysisOutput } from '@/ai/flows/agreement-analysis';
+import { generateDescription as generateDescriptionFlow } from '@/ai/flows/description-generator';
 
 
 const offereeSchema = z.object({
@@ -75,6 +76,19 @@ export async function analyzeAgreementTerms(terms: string): Promise<AgreementAna
     } catch (e) {
         console.error(e);
         return { error: "An unexpected error occurred while analyzing the agreement." }
+    }
+}
+
+export async function generateAgreementDescription(title: string): Promise<{ description: string } | { error: string }> {
+    if (!title || title.length < 5) {
+        return { error: "Please enter a title of at least 5 characters to generate a description." }
+    }
+    try {
+        const result = await generateDescriptionFlow({ title });
+        return { description: result.description };
+    } catch (e) {
+        console.error(e);
+        return { error: "An unexpected error occurred while generating the description." }
     }
 }
 
