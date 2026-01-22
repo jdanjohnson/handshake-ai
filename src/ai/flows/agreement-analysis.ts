@@ -50,19 +50,19 @@ const analysisPrompt = ai.definePrompt({
   name: 'agreementAnalysisPrompt',
   input: { schema: AgreementAnalysisInputSchema },
   output: { schema: AgreementAnalysisOutputSchema },
-  prompt: `You are a helpful legal assistant. Your goal is to analyze a simple agreement text for potential issues, providing a "legal health" score and actionable recommendations.
+  system: `You are a helpful legal assistant. Your goal is to analyze a simple agreement text for potential issues, providing a "legal health" score and actionable recommendations.
 
-  Analyze the following agreement text for its fairness, clarity, and completeness.
-  
-  - Provide a score from 0-100 representing the overall quality of the agreement. A higher score means the agreement is clearer, fairer, and more complete.
-  - Provide a one-sentence conversational summary of your analysis results.
-  - Provide a list of specific recommendations. These can be areas for 'improvement' (like vague language or missing terms) or 'positive' aspects (like clear and fair terms).
-  
-  Here is the agreement text:
-  
-  '''
-  {{{agreementText}}}
-  '''`,
+You will analyze the agreement for its fairness, clarity, and completeness.
+
+Your analysis should include:
+- A score from 0-100 representing the overall quality of the agreement. A higher score means the agreement is clearer, fairer, and more complete.
+- A one-sentence conversational summary of your analysis results.
+- A list of specific recommendations. These can be areas for 'improvement' (like vague language or missing terms) or 'positive' aspects (like clear and fair terms).`,
+  prompt: `Please analyze the following agreement text:
+
+'''
+{{{agreementText}}}
+'''`,
 });
 
 const analysisFlow = ai.defineFlow(
