@@ -10,14 +10,14 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
-export const AgreementAnalysisInputSchema = z.object({
+const AgreementAnalysisInputSchema = z.object({
   agreementText: z.string().describe('The text of the agreement to analyze.'),
 });
 export type AgreementAnalysisInput = z.infer<
   typeof AgreementAnalysisInputSchema
 >;
 
-export const AgreementAnalysisOutputSchema = z.object({
+const AgreementAnalysisOutputSchema = z.object({
   score: z
     .number()
     .describe(
