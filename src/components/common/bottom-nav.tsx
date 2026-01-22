@@ -2,14 +2,12 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, FileArchive, Users, UserCircle } from 'lucide-react';
+import { Home, FileArchive } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
   { href: "/", label: "Home", icon: Home },
   { href: "/vault", label: "Vault", icon: FileArchive },
-  { href: "/network", label: "Network", icon: Users },
-  { href: "/profile", label: "Profile", icon: UserCircle },
 ];
 
 export default function BottomNav() {

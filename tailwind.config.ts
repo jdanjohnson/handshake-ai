@@ -80,8 +80,10 @@ export default {
           }
         },
         scan: {
-            '0%, 100%': { top: '0%' },
-            '50%': { top: '100%' },
+            '0%': { top: '-10%', opacity: '0' },
+            '10%': { top: '0%', opacity: '1' },
+            '90%': { top: '100%', opacity: '1' },
+            '100%': { top: '110%', opacity: '0' },
         }
       },
       animation: {

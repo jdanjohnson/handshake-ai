@@ -60,9 +60,10 @@ export async function acceptOffer(offerId: string, offereeEmail: string) {
         revalidatePath('/');
         revalidatePath('/vault');
         revalidatePath(`/offers/${offerId}`);
-        return { success: true, message: 'Offer accepted!' };
+        return { success: true, message: 'Offer accepted!', offer: updatedOffer };
     } catch (error) {
-        return { success: false, message: 'Failed to accept offer.' };
+        const message = error instanceof Error ? error.message : 'Failed to accept offer.';
+        return { success: false, message };
     }
 }
 

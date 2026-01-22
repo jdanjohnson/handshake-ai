@@ -27,35 +27,16 @@ export type DescriptionGeneratorOutput = z.infer<
 export async function generateDescription(
   input: DescriptionGeneratorInput
 ): Promise<DescriptionGeneratorOutput> {
-  return descriptionGeneratorFlow(input);
+  
+  // This is a mock implementation
+  console.log("Generating description for title:", input.title);
+  
+  // Simulate network delay
+  await new Promise(resolve => setTimeout(resolve, 1000));
+
+  const MOCK_CAMERA_DESCRIPTION = "This agreement covers the loan of a digital camera from Party A to Party B for personal use during a vacation. The loan period is approximately one week, and the camera is to be returned in the same condition it was received.";
+
+  return {
+    description: MOCK_CAMERA_DESCRIPTION
+  };
 }
-
-const prompt = ai.definePrompt({
-  name: 'descriptionGeneratorPrompt',
-  input: {schema: DescriptionGeneratorInputSchema},
-  output: {schema: DescriptionGeneratorOutputSchema},
-  prompt: `You are a helpful assistant that helps users draft simple legal agreements.
-  Based on the following agreement title, write a clear, concise, one-paragraph description of the deal.
-  This description will be the starting point for the user's agreement.
-
-  Focus on key actions and deliverables. For example, if the title is "Freelance Website Design", the description could be:
-  "Party A will design and develop a 5-page website for Party B. Deliverables include mockups, development, and deployment. Party B will provide all necessary content. The project is expected to be completed within 4 weeks."
-
-  Agreement Title:
-  {{{title}}}
-
-  Provide your response ONLY in the specified JSON format.
-  `,
-});
-
-const descriptionGeneratorFlow = ai.defineFlow(
-  {
-    name: 'descriptionGeneratorFlow',
-    inputSchema: DescriptionGeneratorInputSchema,
-    outputSchema: DescriptionGeneratorOutputSchema,
-  },
-  async input => {
-    const {output} = await prompt(input);
-    return output!;
-  }
-);

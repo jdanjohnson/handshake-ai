@@ -5,7 +5,7 @@ import { ArrowRight, Mail, Handshake } from 'lucide-react';
 import type { Offer } from '@/lib/data';
 import { mockOffers } from '@/lib/data';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import BottomNav from '@/components/common/bottom-nav';
 
@@ -39,7 +39,6 @@ function IncomingRequest({ offer }: { offer: Offer }) {
 
 
 export default function Home() {
-    // In a real app, this would be determined by user authentication
     const currentUserEmail = DUMMY_USER_EMAIL;
 
     const incomingRequests = mockOffers.filter(offer =>

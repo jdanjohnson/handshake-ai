@@ -5,10 +5,10 @@ import type { Offer } from '@/lib/data';
 import { Button } from '@/components/ui/button';
 import { acceptOffer } from '@/lib/actions';
 import { useToast } from '@/hooks/use-toast';
-import { HandshakeIcon } from '@/components/icons/handshake-icon';
-import { CheckCircle2, Clock, Edit, FileText, Gavel, Group, LinkIcon, Loader2, Send, Share, Signature } from 'lucide-react';
+import { Handshake, CheckCircle2, Clock, Edit, FileText, Gavel, Group, Link as LinkIcon, Loader2, Send, Share, Signature } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import Image from 'next/image';
+import { notFound } from 'next/navigation';
 
 const DUMMY_USER_EMAIL = 'iamjadan@gmail.com';
 
@@ -137,7 +137,7 @@ function ReviewAndSign({ offer, onAccept }: { offer: Offer, onAccept: () => void
                              {isPending || isShaking ? (
                                 <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                             ) : (
-                               <HandshakeIcon className="w-5 h-5" />
+                               <Handshake className="w-5 h-5" />
                             )}
                             {isShaking ? 'Sealing...' : 'Confirm & Sign'}
                         </Button>
@@ -185,7 +185,7 @@ function AgreementDetails({ offer }: { offer: Offer }) {
                 <div className="p-4">
                     <div className="flex flex-col items-stretch justify-start rounded-xl shadow-lg bg-card dark:bg-gray-900 border border-border dark:border-gray-800 overflow-hidden">
                         <div className="w-full relative aspect-[16/10]">
-                            <Image src="https://picsum.photos/seed/agreement-details/600/400" alt={offer.title} layout="fill" objectFit="cover" data-ai-hint="digital handshake agreement" />
+                            <Image src="https://picsum.photos/seed/agreement-details/600/400" alt={offer.title} fill objectFit="cover" data-ai-hint="digital handshake agreement" />
                         </div>
                         <div className="flex w-full flex-col items-stretch justify-center gap-3 p-5">
                             <div className="flex justify-between items-center">
@@ -261,15 +261,14 @@ export function OfferDetails({ offer: initialOffer }: { offer: Offer }) {
     const canAccept = offer.status === 'pending' && offer.offerees.some(o => o.email === DUMMY_USER_EMAIL);
 
     const handleAccept = async () => {
+        if (!offer) return;
         const result = await acceptOffer(offer.id, offer.offerees[0]?.email || '');
-        if (result.success) {
+        if (result.success && result.offer) {
             toast({
                 title: 'Agreement Sealed!',
                 description: 'The offer has been accepted.',
             });
-            // This is a client component, so we need to refresh the data
-            const updatedOffer = await import('@/lib/data').then(mod => mod.getOfferById(offer.id));
-            if (updatedOffer) setOffer(updatedOffer);
+            setOffer(result.offer);
         } else {
             toast({
                 title: 'Error',

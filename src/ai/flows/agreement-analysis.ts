@@ -46,43 +46,37 @@ export type AgreementAnalysisOutput = z.infer<
   typeof AgreementAnalysisOutputSchema
 >;
 
+const MOCK_CAMERA_ANALYSIS: AgreementAnalysisOutput = {
+    score: 82,
+    summary: "This agreement is clear and fair, but could be improved by adding a specific return date and clarifying the condition of the camera upon return.",
+    recommendations: [
+        {
+            title: "Add a specific return date",
+            description: "The agreement mentions a loan period of 'about a week'. Specifying an exact date (e.g., October 24, 2024) will prevent any confusion.",
+            type: "improvement",
+        },
+        {
+            title: "Define consequences for damage",
+            description: "Consider adding a clause that outlines who is responsible for repair costs if the camera is damaged during the loan period.",
+            type: "improvement",
+        },
+        {
+            title: "Scope of use is clear",
+            description: "The agreement clearly states the camera is for personal use during a vacation, which is a great, specific detail.",
+            type: "positive",
+        },
+    ]
+};
+
+
 export async function analyzeAgreement(
   input: AgreementAnalysisInput
 ): Promise<AgreementAnalysisOutput> {
-  return agreementAnalysisFlow(input);
+  // This is a mock implementation that simulates an AI call
+  console.log("Analyzing agreement with mock data:", input.agreementText);
+
+  // Simulate network delay
+  await new Promise(resolve => setTimeout(resolve, 1500));
+
+  return MOCK_CAMERA_ANALYSIS;
 }
-
-const prompt = ai.definePrompt({
-  name: 'agreementAnalysisPrompt',
-  input: {schema: AgreementAnalysisInputSchema},
-  output: {schema: AgreementAnalysisOutputSchema},
-  prompt: `You are an expert legal AI specializing in reviewing simple contracts and handshake deals for fairness, completeness, and clarity. Your tone is helpful, professional, and reassuring.
-
-  Analyze the following agreement text. Based on your analysis, provide:
-  1.  A "Legal Health Score" from 0 to 100. A score of 100 means the agreement is perfectly clear, fair, and complete. A score of 0 means it is critically flawed.
-      -   Deduct points for vague language (e.g., "soon", "reasonable effort").
-      -   Deduct points for missing essential details (e.g., no deadline, no payment amount, unclear deliverables).
-      -   Deduct points for terms that seem one-sided or unfair.
-      -   Award points for clarity, specificity, and balanced terms.
-  2.  A list of specific recommendations. Each recommendation should have a title, a description, and a type ('positive' for things done well, 'improvement' for things to fix). Focus on actionable advice.
-  3.  A short, one-sentence conversational summary of your findings for the user.
-
-  Agreement Text:
-  {{{agreementText}}}
-
-  Provide your response ONLY in the specified JSON format.
-  `,
-});
-
-const agreementAnalysisFlow = ai.defineFlow(
-  {
-    name: 'agreementAnalysisFlow',
-    inputSchema: AgreementAnalysisInputSchema,
-    outputSchema: AgreementAnalysisOutputSchema,
-  },
-  async input => {
-    // A real implementation might have more logic here, like retrieving user context or calling other tools.
-    const {output} = await prompt(input);
-    return output!;
-  }
-);

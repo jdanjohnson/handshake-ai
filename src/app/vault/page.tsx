@@ -32,10 +32,10 @@ export default function VaultPage() {
   const [activeTab, setActiveTab] = useState<'active' | 'drafts'>('active');
 
   const filteredOffers = useMemo(() => {
-    const allOffers = mockOffers.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    const allOffers = mockOffers.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     switch (activeTab) {
       case 'active':
-        return allOffers.filter(o => o.status === 'accepted');
+        return allOffers.filter(o => o.status === 'accepted' || o.status === 'pending');
       case 'drafts':
         return allOffers.filter(o => o.status === 'draft');
       default:

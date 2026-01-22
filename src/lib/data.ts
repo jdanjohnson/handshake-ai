@@ -6,103 +6,61 @@ export type Offeree = {
   email: string;
 };
 
-export type SpecificTerm = {
-  title: string;
-  description: string;
-};
-
 export type Offer = {
   id: string;
   title: string;
   terms: string;
-  specificTerms?: SpecificTerm[];
   paymentAmount?: string;
   paymentDueDate?: string;
-  paymentMethod?: string;
-  duration?: string;
-  location?: string;
   offerorName: string;
   offerorEmail: string;
   offerees: Offeree[];
   status: 'pending' | 'accepted' | 'draft';
-  createdAt: Date;
-  acceptedAt: Date | null;
+  createdAt: string; // Using ISO string for consistency
+  acceptedAt: string | null;
   imageUrl: string;
 };
 
-// Renamed to avoid conflicts if you choose to fetch later.
+
 export const mockOffers: Offer[] = [
     {
-        id: 'creative-collab-1',
-        title: 'Creative Project Collab',
-        terms: 'Create 3 logo concepts for a new startup. One final logo will be chosen with up to 3 revision rounds. Final assets delivered in SVG and PNG formats.',
+        id: 'camera-loan-1',
+        title: 'Camera Loan to Friend',
+        terms: 'This agreement covers the loan of my Sony A7IV camera to Alex for their trip to Italy. The loan period is one week, and the camera must be returned in the same condition it was received. A security deposit of $100 is required.',
         offerorName: 'Jadan',
         offerorEmail: 'iamjadan@gmail.com',
-        offerees: [{ name: 'Sarah Jenkins', email: 'design@creative.co' }],
-        status: 'pending',
-        createdAt: new Date(new Date().setDate(new Date().getDate() - 1)),
-        acceptedAt: null,
-        location: 'New York, NY',
-        specificTerms: [
-            { title: 'Deliverable 1', description: '3 initial logo concepts.' },
-            { title: 'Revisions', description: 'Up to 3 rounds of revisions on the chosen concept.' },
-            { title: 'Final Delivery', description: 'Final logo in SVG and PNG formats.' },
-        ],
-        paymentAmount: '$1,200',
-        paymentDueDate: 'Upon final delivery',
-        paymentMethod: 'Bank Transfer',
-        imageUrl: 'creative-project'
+        offerees: [{ name: 'Alex Morgan', email: 'alex@example.com' }],
+        status: 'accepted',
+        createdAt: new Date(new Date().setDate(new Date().getDate() - 10)).toISOString(),
+        acceptedAt: new Date(new Date().setDate(new Date().getDate() - 8)).toISOString(),
+        paymentAmount: '$100 Security Deposit',
+        paymentDueDate: 'Oct 24, 2024',
+        imageUrl: 'creative-project' // Using existing image key
     },
     {
-        id: 'equipment-rental-2',
-        title: 'Equipment Rental',
-        terms: 'Provide 10 hours of marketing consulting over the next month. Focus on social media strategy and content planning. Billed at $150/hour.',
+        id: 'consulting-gig-2',
+        title: 'Marketing Consulting',
+        terms: 'Provide 10 hours of marketing consulting over the next month, focusing on social media strategy. Billed at $150/hour.',
         offerorName: 'Mike Ross',
         offerorEmail: 'mike@ross.com',
         offerees: [{ name: 'Jadan', email: 'iamjadan@gmail.com' }],
-        status: 'accepted',
-        createdAt: new Date(new Date().setDate(new Date().getDate() - 20)),
-        acceptedAt: new Date(new Date().setDate(new Date().getDate() - 18)),
-        duration: '1 month from start date.',
-        imageUrl: 'equipment-rental'
-    },
-    {
-        id: 'consulting-agreement-3',
-        title: 'Consulting Agreement',
-        terms: 'Consulting services for Q3.',
-        offerorName: 'Jessica Pearson',
-        offerorEmail: 'jessica@pearson.com',
-        offerees: [{ name: 'Jadan', email: 'iamjadan@gmail.com' }],
-        status: 'draft',
-        createdAt: new Date(new Date().setDate(new Date().getDate() - 30)),
+        status: 'pending',
+        createdAt: new Date(new Date().setDate(new Date().getDate() - 2)).toISOString(),
         acceptedAt: null,
-        location: 'Chicago, IL',
+        paymentAmount: '$1,500',
         imageUrl: 'consulting-agreement'
     },
     {
-        id: 'lease-agreement-4',
-        title: 'Apartment Lease Agreement',
-        terms: '12-month lease for apartment #4B at 123 Main St. Rent is $2000/month, due on the 1st. Security deposit of $2000 required. No pets allowed. Tenant responsible for utilities.',
-        offerorName: 'City Apartments',
-        offerorEmail: 'leasing@cityapts.com',
+        id: 'apartment-lease-3',
+        title: 'Apartment Lease',
+        terms: '12-month lease for apartment #4B. Rent is $2000/month, due on the 1st. Security deposit of $2000 required.',
+        offerorName: 'Landlord Property Group',
+        offerorEmail: 'leasing@landlord.com',
         offerees: [{ name: 'Jadan', email: 'iamjadan@gmail.com' }],
-        status: 'pending',
-        createdAt: new Date(new Date().setDate(new Date().getDate() - 2)),
+        status: 'draft',
+        createdAt: new Date(new Date().setDate(new Date().getDate() - 30)).toISOString(),
         acceptedAt: null,
-        location: '123 Main St, Anytown, USA',
         imageUrl: 'lease-agreement'
-    },
-    {
-        id: 'writing-contract-5',
-        title: 'Freelance Writing Contract',
-        terms: 'Write four 1000-word blog posts on the topic of sustainable travel. SEO keywords will be provided. All articles must be original and pass plagiarism checks. Delivery schedule: one article per week.',
-        offerorName: 'Content Factory',
-        offerorEmail: 'editor@contentfactory.com',
-        offerees: [{ name: 'Jadan', email: 'iamjadan@gmail.com' }],
-        status: 'accepted',
-        createdAt: new Date(new Date().setDate(new Date().getDate() - 10)),
-        acceptedAt: new Date(new Date().setDate(new Date().getDate() - 8)),
-        imageUrl: 'writing-contract'
     },
 ];
 
@@ -111,7 +69,7 @@ let offers = [...mockOffers]; // Create a mutable copy
 export async function getOffersByEmail(email: string) {
   return offers.filter(
     (offer) => offer.offerorEmail.toLowerCase() === email.toLowerCase() || offer.offerees.some(offeree => offeree.email.toLowerCase() === email.toLowerCase())
-  ).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  ).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
 export async function getOfferById(id: string) {
@@ -123,9 +81,9 @@ export async function addOffer(offerData: Omit<Offer, 'id' | 'status' | 'created
         ...offerData,
         id: (Math.random() + 1).toString(36).substring(2),
         status: 'pending',
-        createdAt: new Date(),
+        createdAt: new Date().toISOString(),
         acceptedAt: null,
-        imageUrl: 'default',
+        imageUrl: 'default', // default placeholder
     };
     offers.unshift(newOffer);
     return newOffer;
@@ -136,7 +94,7 @@ export async function updateOfferStatus(id: string, status: 'accepted') {
     if (offerIndex !== -1) {
         if (status === 'accepted') {
             offers[offerIndex].status = 'accepted';
-            offers[offerIndex].acceptedAt = new Date();
+            offers[offerIndex].acceptedAt = new Date().toISOString();
         }
         return offers[offerIndex];
     }
