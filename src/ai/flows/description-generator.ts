@@ -28,14 +28,8 @@ const descriptionPrompt = ai.definePrompt({
   name: 'descriptionGeneratorPrompt',
   input: { schema: DescriptionGeneratorInputSchema },
   output: { schema: DescriptionGeneratorOutputSchema },
-  prompt: `You are a helpful assistant who is an expert at writing simple, clear legal agreements.
-
-  Based on the provided agreement title, generate a concise, one-paragraph description for the deal. This description will serve as the starting point for a simple legal agreement.
-  
-  Focus on clarity and simplicity. The description should cover the essential purpose of the agreement.
-  
-  Agreement Title: {{{title}}}
-  `,
+  system: `You are a helpful assistant who is an expert at writing simple, clear legal agreements. Your task is to generate a concise, one-paragraph description for a deal based on its title. This description will serve as the starting point for a simple legal agreement. Focus on clarity and simplicity, and ensure the description covers the essential purpose of the agreement.`,
+  prompt: `Agreement Title: {{{title}}}`,
 });
 
 const descriptionFlow = ai.defineFlow({
