@@ -1,24 +1,36 @@
 'use client';
 
-import { useState, useTransition } from 'react';
-import { useForm, FormProvider, useFormContext, Controller } from 'react-hook-form';
+import { useState, useTransition, useMemo } from 'react';
+import { useForm, FormProvider, Controller, useFieldArray, useFormContext } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { createOffer } from '@/lib/actions';
+import { createOffer, analyzeAgreementTerms } from '@/lib/actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
-import { ArrowLeft, ArrowRight, DollarSign, Calendar, Edit, FileText, Group, Handshake, Info, Link as LinkIcon, Loader2, UserPlus, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, DollarSign, Calendar, FileText, Group, Handshake, Info, Link as LinkIcon, Loader2, UserPlus, X, Trash2, Bot, Sparkles, CheckCircle2, AlertCircle, Wand2, ShieldCheck, CalendarX, Wallet, CheckCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { HandshakeIcon } from '@/components/icons/handshake-icon';
+import type { AgreementAnalysisOutput } from '@/ai/flows/agreement-analysis';
+import { cn } from '@/lib/utils';
+
+
+const offereeSchema = z.object({
+  name: z.string().min(2, { message: "Name is required." }),
+  email: z.string().email({ message: "A valid email is required." }),
+});
+
+const specificTermSchema = z.object({
+    title: z.string().min(3, "Title must be at least 3 characters."),
+    description: z.string().min(10, "Description must be at least 10 characters.")
+})
 
 const offerSchema = z.object({
   title: z.string().min(5, { message: "Title must be at least 5 characters." }),
-  offereeEmail: z.string().email({ message: "Please enter a valid email for the other party." }),
-  offereeName: z.string().min(2, { message: "Other party's name is required." }),
+  offerees: z.array(offereeSchema).min(1, "At least one other party is required."),
   terms: z.string().min(20, { message: "The deal description must be at least 20 characters." }),
   paymentAmount: z.string().optional(),
   paymentDueDate: z.string().optional(),
@@ -33,19 +45,20 @@ const DUMMY_USER = {
 }
 
 function getInitials(name: string) {
-    return name.split(' ').map(n => n[0]).join('');
+    return name.split(' ').map(n => n[0]).join('').toUpperCase();
 }
 
 
 const steps = [
-    { id: 1, name: 'Parties & Purpose', fields: ['title', 'offereeEmail', 'offereeName', 'terms'], icon: Group },
+    { id: 1, name: 'Parties & Purpose', fields: ['title', 'offerees', 'terms'], icon: Group },
     { id: 2, name: 'Define Terms', fields: ['paymentAmount', 'paymentDueDate'], icon: DollarSign },
     { id: 3, name: 'Review & Sign', fields: [], icon: Handshake },
 ];
 
 
 function Step1({ onNext }: { onNext: () => Promise<void> }) {
-    const { register, formState: { errors } } = useFormContext<OfferFormData>();
+    const { register, control, formState: { errors } } = useFormContext<OfferFormData>();
+    const { fields, append, remove } = useFieldArray({ control, name: 'offerees' });
     const [isPending, startTransition] = useTransition();
 
     const handleNext = () => {
@@ -62,16 +75,28 @@ function Step1({ onNext }: { onNext: () => Promise<void> }) {
                 {errors.title && <p className="text-sm font-medium text-destructive">{errors.title.message}</p>}
             </div>
 
-            <div className="flex flex-col gap-2">
-                <label className="text-foreground dark:text-gray-200 text-base font-bold">Other Party</label>
-                <div className='space-y-2'>
-                    <Input {...register('offereeName')} placeholder="Their Name" className="p-4 h-auto rounded-xl" />
-                    {errors.offereeName && <p className="text-sm font-medium text-destructive">{errors.offereeName.message}</p>}
-                    <Input {...register('offereeEmail')} type="email" placeholder="Their Email" className="p-4 h-auto rounded-xl" />
-                    {errors.offereeEmail && <p className="text-sm font-medium text-destructive">{errors.offereeEmail.message}</p>}
-                </div>
-                <p className="text-xs text-muted-foreground px-1">We'll send them a secure link to review and sign.</p>
+            <div className="flex flex-col gap-4">
+                <label className="text-foreground dark:text-gray-200 text-base font-bold">Other Parties</label>
+                {fields.map((field, index) => (
+                    <div key={field.id} className="space-y-2 p-3 border rounded-lg bg-background">
+                         <div className="flex justify-between items-center">
+                            <p className="font-semibold text-sm">Party #{index + 1}</p>
+                            <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} className='text-muted-foreground hover:text-destructive'>
+                                <Trash2 className="w-4 h-4" />
+                            </Button>
+                        </div>
+                        <Input {...register(`offerees.${index}.name`)} placeholder="Their Name" className="p-4 h-auto rounded-xl" />
+                        {errors.offerees?.[index]?.name && <p className="text-sm font-medium text-destructive">{errors.offerees?.[index]?.name?.message}</p>}
+                        <Input {...register(`offerees.${index}.email`)} type="email" placeholder="Their Email" className="p-4 h-auto rounded-xl" />
+                        {errors.offerees?.[index]?.email && <p className="text-sm font-medium text-destructive">{errors.offerees?.[index]?.email?.message}</p>}
+                    </div>
+                ))}
+                 <Button type="button" variant="outline" onClick={() => append({ name: '', email: '' })} className="flex items-center gap-2">
+                    <UserPlus /> Add Another Party
+                </Button>
+                {errors.offerees && typeof errors.offerees === 'object' && 'message' in errors.offerees && <p className="text-sm font-medium text-destructive">{errors.offerees.message}</p>}
             </div>
+
 
             <div className="flex flex-col gap-2">
                 <label className="text-foreground dark:text-gray-200 text-base font-bold">Description of the Deal</label>
@@ -88,18 +113,113 @@ function Step1({ onNext }: { onNext: () => Promise<void> }) {
     );
 }
 
-function Step2({ onNext, onBack }: { onNext: () => Promise<void>, onBack: () => void }) {
-    const { register, formState: { errors } } = useFormContext<OfferFormData>();
-    const [isPending, startTransition] = useTransition();
+function AIAnalysisView({ result, onBack }: { result: AgreementAnalysisOutput, onBack: () => void }) {
+    const { score, recommendations } = result;
+
+    const getIconForRec = (type: 'positive' | 'improvement') => {
+        if (type === 'positive') {
+            return <CheckCircle className="text-success" />;
+        }
+        return <AlertCircle className="text-accent" />;
+    }
+
+    return (
+        <div className="px-4 space-y-4">
+            <div className="bg-card border rounded-2xl p-5 ai-glow">
+                <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                        <div className="size-10 rounded-full bg-success/10 flex items-center justify-center text-success">
+                            <ShieldCheck />
+                        </div>
+                        <div>
+                            <h3 className="font-bold text-foreground">Legal Health Score</h3>
+                            <p className="text-xs text-muted-foreground">Analysis complete</p>
+                        </div>
+                    </div>
+                    <div className="text-right">
+                        <span className="text-3xl font-black text-success">{score}</span>
+                        <span className="text-sm font-bold text-muted-foreground">/100</span>
+                    </div>
+                </div>
+                <Progress value={score} className="h-2 [&>div]:bg-success" />
+            </div>
+
+            <div className="space-y-3">
+                 <div className="flex items-center gap-2 px-2">
+                    <Sparkles className="text-primary/40 text-sm" />
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-primary/40">AI Recommendations</span>
+                </div>
+                {recommendations.map((rec, index) => (
+                    <div key={index} className={cn("border rounded-xl p-4 flex gap-4", {
+                        'bg-accent/5 border-accent/20': rec.type === 'improvement',
+                        'bg-success/5 border-success/20': rec.type === 'positive'
+                    })}>
+                        <div className={cn("size-10 shrink-0 rounded-full flex items-center justify-center", {
+                             'bg-accent/10 text-accent': rec.type === 'improvement',
+                             'bg-success/10 text-success': rec.type === 'positive'
+                        })}>
+                           {rec.type === 'improvement' ? <AlertCircle /> : <CheckCircle />}
+                        </div>
+                        <div>
+                            <h4 className="text-sm font-bold text-foreground mb-1">{rec.title}</h4>
+                            <p className="text-xs text-muted-foreground leading-relaxed">{rec.description}</p>
+                        </div>
+                    </div>
+                ))}
+            </div>
+            <Button onClick={onBack} variant="outline" className="w-full">Back to Form</Button>
+        </div>
+    );
+}
+
+function Step2({ onNext, onBack, setAnalysisResult }: { onNext: () => Promise<void>, onBack: () => void, setAnalysisResult: (result: AgreementAnalysisOutput) => void }) {
+    const { register, getValues, formState: { errors } } = useFormContext<OfferFormData>();
+    const [isNextPending, startNextTransition] = useTransition();
+    const [isAnalyzing, startAnalysisTransition] = useTransition();
+    const [analysisError, setAnalysisError] = useState<string | null>(null);
+    const [showAnalysis, setShowAnalysis] = useState(false);
+    const [internalAnalysisResult, setInternalAnalysisResult] = useState<AgreementAnalysisOutput | null>(null);
+    const { toast } = useToast();
 
     const handleNext = () => {
-        startTransition(async () => {
+        startNextTransition(async () => {
             await onNext();
         });
     }
 
+    const handleAnalyze = () => {
+        const terms = getValues('terms');
+        setAnalysisError(null);
+        startAnalysisTransition(async () => {
+            const result = await analyzeAgreementTerms(terms);
+            if ('error' in result) {
+                setAnalysisError(result.error);
+                toast({ title: "Analysis Failed", description: result.error, variant: 'destructive' });
+            } else {
+                setAnalysisResult(result);
+                setInternalAnalysisResult(result);
+                setShowAnalysis(true);
+            }
+        });
+    }
+
+    if (showAnalysis && internalAnalysisResult) {
+        return <AIAnalysisView result={internalAnalysisResult} onBack={() => setShowAnalysis(false)} />
+    }
+
     return (
         <div className="flex-1 space-y-8">
+             <div className="relative bg-card p-4 rounded-xl border">
+                 <div className="flex justify-between items-center mb-2">
+                    <label className="text-foreground dark:text-gray-200 text-base font-bold">AI Legal Analysis</label>
+                    <Button type="button" variant="ghost" size="sm" onClick={handleAnalyze} disabled={isAnalyzing}>
+                        {isAnalyzing ? <Loader2 className="animate-spin" /> : <><Wand2 className="mr-2" /> Analyze</>}
+                    </Button>
+                 </div>
+                 <p className="text-xs text-muted-foreground mb-4">Check your agreement for clarity, fairness, and completeness before sending.</p>
+                 {analysisError && <p className="text-sm font-medium text-destructive">{analysisError}</p>}
+            </div>
+
             <div className="flex flex-col gap-2">
                 <label className="text-foreground dark:text-gray-200 text-base font-bold">Total Payment (Optional)</label>
                 <div className='relative'>
@@ -119,19 +239,19 @@ function Step2({ onNext, onBack }: { onNext: () => Promise<void>, onBack: () => 
             </div>
             
             <div className="flex justify-between gap-4">
-                <Button type="button" variant="outline" onClick={onBack} disabled={isPending} className="h-12 px-6 rounded-xl">
+                <Button type="button" variant="outline" onClick={onBack} disabled={isNextPending} className="h-12 px-6 rounded-xl">
                     <ArrowLeft className="mr-2" /> Back
                 </Button>
-                <Button onClick={handleNext} disabled={isPending} className="h-12 px-6 rounded-xl flex-[2] bg-primary text-white font-bold shadow-lg shadow-primary/20 transition-all">
-                     {isPending ? <Loader2 className="animate-spin" /> : "Next: Review"}
-                    {!isPending && <ArrowRight className="ml-2 w-5 h-5" />}
+                <Button onClick={handleNext} disabled={isNextPending} className="h-12 px-6 rounded-xl flex-[2] bg-primary text-white font-bold shadow-lg shadow-primary/20 transition-all">
+                     {isNextPending ? <Loader2 className="animate-spin" /> : "Next: Review"}
+                    {!isNextPending && <ArrowRight className="ml-2 w-5 h-5" />}
                 </Button>
             </div>
         </div>
     );
 }
 
-function Step3({ onBack }: { onBack: () => void }) {
+function Step3({ onBack, analysisResult }: { onBack: () => void, analysisResult: AgreementAnalysisOutput | null }) {
     const { getValues } = useFormContext<OfferFormData>();
     const data = getValues();
     const offeror = DUMMY_USER;
@@ -139,6 +259,22 @@ function Step3({ onBack }: { onBack: () => void }) {
     return (
         <div className="flex-1">
              <div className="shadow-lg bg-card dark:bg-card-dark border border-border dark:border-gray-800 rounded-xl p-6 relative overflow-hidden">
+                
+                {analysisResult && (
+                    <div className="mb-8 relative z-10 bg-card dark:bg-background-dark/40 border border-ai-purple/20 rounded-xl p-4 shadow-sm">
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                                <Sparkles className="text-ai-purple text-lg" />
+                                <span className="text-ai-purple font-bold text-xs uppercase tracking-wider">AI Insights</span>
+                            </div>
+                            <div className="flex items-center gap-1 bg-success/10 px-2 py-0.5 rounded-full">
+                                <span className="text-[10px] font-bold text-success">CONFIDENCE: {analysisResult.score}%</span>
+                            </div>
+                        </div>
+                        <p className="text-muted-foreground text-xs leading-tight">{analysisResult.summary}</p>
+                    </div>
+                )}
+
                 <div className="mb-8 relative z-10">
                     <div className="flex items-center gap-2 mb-4">
                         <Group className="text-success text-sm" />
@@ -157,15 +293,17 @@ function Step3({ onBack }: { onBack: () => void }) {
                         <div className="flex items-center justify-center w-8 ml-1">
                             <LinkIcon className="text-foreground/20 dark:text-white/20 text-sm" />
                         </div>
-                        <div className="flex items-center gap-3">
-                             <Avatar className='h-10 w-10'>
-                                <AvatarFallback className="bg-accent text-white font-bold">{getInitials(data.offereeName || 'C')}</AvatarFallback>
-                            </Avatar>
-                            <div>
-                                <p className="text-foreground dark:text-white font-bold leading-none">{data.offereeName}</p>
-                                <p className="text-foreground/50 dark:text-gray-500 text-xs mt-1">Client</p>
+                        {data.offerees.map((offeree, index) => (
+                            <div key={index} className="flex items-center gap-3">
+                                <Avatar className='h-10 w-10'>
+                                    <AvatarFallback className="bg-accent text-white font-bold">{getInitials(offeree.name || 'P')}</AvatarFallback>
+                                </Avatar>
+                                <div>
+                                    <p className="text-foreground dark:text-white font-bold leading-none">{offeree.name}</p>
+                                    <p className="text-foreground/50 dark:text-gray-500 text-xs mt-1">Client</p>
+                                </div>
                             </div>
-                        </div>
+                        ))}
                     </div>
                 </div>
 
@@ -201,7 +339,7 @@ function Step3({ onBack }: { onBack: () => void }) {
             </div>
             <div className="p-6">
                  <Button type="button" variant="ghost" onClick={onBack} className="h-12 px-6 rounded-xl flex items-center justify-center gap-2 w-full">
-                    <Edit className="w-4 h-4" /> Edit
+                    <ArrowLeft className="w-4 h-4" /> Back to Edit
                 </Button>
             </div>
         </div>
@@ -211,6 +349,7 @@ function Step3({ onBack }: { onBack: () => void }) {
 export function CreateOfferForm() {
     const [currentStep, setCurrentStep] = useState(1);
     const [isPending, startTransition] = useTransition();
+    const [analysisResult, setAnalysisResult] = useState<AgreementAnalysisOutput | null>(null);
     const { toast } = useToast();
     const router = useRouter();
 
@@ -218,8 +357,7 @@ export function CreateOfferForm() {
         resolver: zodResolver(offerSchema),
         defaultValues: {
             title: '',
-            offereeEmail: '',
-            offereeName: '',
+            offerees: [{ name: '', email: '' }],
             terms: '',
             paymentAmount: '',
             paymentDueDate: '',
@@ -248,8 +386,7 @@ export function CreateOfferForm() {
             const result = await createOffer({
                 ...data,
                 offerorName: DUMMY_USER.name,
-                offerorEmail: DUMMY_USER.email,
-                offerees: [{ name: data.offereeName, email: data.offereeEmail }]
+                offerorEmail: DUMMY_USER.email
             });
             if (result.success && result.offer) {
                 toast({ title: "Handshake Sent!", description: "Your offer has been sent for review." });
@@ -295,8 +432,8 @@ export function CreateOfferForm() {
                     </div>
                     <form onSubmit={handleSubmit(processForm)} className="flex-1 px-6 space-y-6 pb-32">
                         {currentStep === 1 && <Step1 onNext={nextStep} />}
-                        {currentStep === 2 && <Step2 onNext={nextStep} onBack={prevStep} />}
-                        {currentStep === 3 && <Step3 onBack={prevStep} />}
+                        {currentStep === 2 && <Step2 onNext={nextStep} onBack={prevStep} setAnalysisResult={setAnalysisResult} />}
+                        {currentStep === 3 && <Step3 onBack={prevStep} analysisResult={analysisResult} />}
                     </form>
                 </main>
                  {currentStep === 3 && (

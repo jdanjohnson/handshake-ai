@@ -1,4 +1,4 @@
 import { config } from 'dotenv';
 config();
 
-import '@/ai/flows/agreement-completeness-check.ts';
+import '@/ai/flows/agreement-analysis.ts';

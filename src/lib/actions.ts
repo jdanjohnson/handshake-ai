@@ -3,16 +3,19 @@
 import { z } from 'zod';
 import { addOffer, updateOfferStatus, getOfferById } from './data';
 import { revalidatePath } from 'next/cache';
-import { agreementCompletenessCheck } from '@/ai/flows/agreement-completeness-check';
+import { analyzeAgreement, AgreementAnalysisOutput } from '@/ai/flows/agreement-analysis';
+
+
+const offereeSchema = z.object({
+  name: z.string().min(2, { message: "Name is required." }),
+  email: z.string().email({ message: "A valid email is required." }),
+});
 
 const offerSchema = z.object({
   title: z.string().min(5, { message: "Title must be at least 5 characters." }),
   offerorName: z.string(),
   offerorEmail: z.string().email(),
-  offerees: z.array(z.object({
-    name: z.string().min(2, { message: "Name must be at least 2 characters." }),
-    email: z.string().email({ message: "Please enter a valid email." }),
-  })).min(1),
+  offerees: z.array(offereeSchema).min(1, "At least one other party is required."),
   terms: z.string().min(20, { message: "The deal description must be at least 20 characters." }),
   paymentAmount: z.string().optional(),
   paymentDueDate: z.string().optional(),
@@ -62,16 +65,16 @@ export async function acceptOffer(offerId: string, offereeEmail: string) {
     }
 }
 
-export async function checkCompleteness(terms: string) {
+export async function analyzeAgreementTerms(terms: string): Promise<AgreementAnalysisOutput | { error: string }> {
     if (!terms || terms.length < 20) {
-        return { error: "Please enter at least 20 characters of your agreement terms to check." }
+        return { error: "Please enter at least 20 characters of your agreement terms to analyze." }
     }
     try {
-        const result = await agreementCompletenessCheck({ agreementText: terms });
+        const result = await analyzeAgreement({ agreementText: terms });
         return result;
     } catch (e) {
         console.error(e);
-        return { error: "An unexpected error occurred while checking the agreement." }
+        return { error: "An unexpected error occurred while analyzing the agreement." }
     }
 }
 
