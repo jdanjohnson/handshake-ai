@@ -1,456 +1,240 @@
 'use client';
 
-import { useState, useTransition, type ReactNode, useEffect } from 'react';
-import { useForm, FormProvider, Controller, useFormContext, useFieldArray } from 'react-hook-form';
+import { useState, useTransition } from 'react';
+import { useForm, FormProvider, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useSearchParams } from 'next/navigation';
-import { createOffer, checkCompleteness, getOffer } from '@/lib/actions';
+import { createOffer } from '@/lib/actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Handshake, Users, FileText, MapPin, Search, CheckCircle, Copy, Loader2, ArrowLeft, ArrowRight, Lightbulb, ShieldCheck, AlertTriangle, PartyPopper, Plus, Trash2 } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { ArrowLeft, ArrowRight, DollarSign, Calendar, Edit, FileText, Group, Handshake, Info, Link as LinkIcon, Loader2, UserPlus, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import type { Offer } from '@/lib/data';
-import { AgreementCompletenessCheckOutput } from '@/ai/flows/agreement-completeness-check';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import Link from 'next/link';
-import { cn } from '@/lib/utils';
-import { AgreementPreview } from '@/components/common/agreement-preview';
+import { useRouter } from 'next/navigation';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { HandshakeIcon } from '@/components/icons/handshake-icon';
 
 const offerSchema = z.object({
-    agreementType: z.string().min(1, { message: "Please select an agreement type." }),
-    customAgreementType: z.string().optional(),
-    offerorName: z.string().min(2, { message: "Your name must be at least 2 characters." }),
-    offerorEmail: z.string().email({ message: "Please enter a valid email for yourself." }),
-    offerees: z.array(z.object({
-        name: z.string().min(2, { message: "Name must be at least 2 characters." }),
-        email: z.string().email({ message: "Please enter a valid email." }),
-    })).min(1, { message: "At least one other party is required." }),
-    terms: z.string().min(20, { message: "The agreement purpose must be at least 20 characters." }),
-    specificTerms: z.array(z.object({
-        title: z.string().min(1, { message: "Term title cannot be empty." }),
-        description: z.string().min(1, { message: "Term description cannot be empty." }),
-    })).optional(),
-    paymentAmount: z.string().optional(),
-    paymentDueDate: z.string().optional(),
-    paymentMethod: z.string().optional(),
-    duration: z.string().optional(),
-    location: z.string().optional(),
-}).refine(data => {
-    if (data.agreementType === 'Other') {
-        return !!data.customAgreementType && data.customAgreementType.trim().length > 2;
-    }
-    return true;
-}, {
-    message: "Please specify your custom agreement type (at least 3 characters).",
-    path: ["customAgreementType"],
+  title: z.string().min(5, { message: "Title must be at least 5 characters." }),
+  offereeEmail: z.string().email({ message: "Please enter a valid email for the other party." }),
+  offereeName: z.string().min(2, { message: "Other party's name is required." }),
+  terms: z.string().min(20, { message: "The deal description must be at least 20 characters." }),
+  paymentAmount: z.string().optional(),
+  paymentDueDate: z.string().optional(),
 });
 
-export type OfferFormData = z.infer<typeof offerSchema>;
+type OfferFormData = z.infer<typeof offerSchema>;
 type FieldName = keyof OfferFormData;
 
-// --- Helper Components ---
+const DUMMY_USER = {
+    name: 'Jadan',
+    email: 'iamjadan@gmail.com'
+}
+
+function getInitials(name: string) {
+    return name.split(' ').map(n => n[0]).join('');
+}
+
 
 const steps = [
-    { id: 1, name: 'Agreement Type', fields: ['agreementType', 'customAgreementType'], icon: Handshake },
-    { id: 2, name: 'Parties', fields: ['offerorName', 'offerorEmail', 'offerees'], icon: Users },
-    { id: 3, name: 'Terms', fields: ['terms', 'specificTerms', 'paymentAmount', 'paymentDueDate', 'paymentMethod', 'duration'], icon: FileText },
-    { id: 4, name: 'Location', fields: ['location'], icon: MapPin },
-    { id: 5, name: 'Review', fields: [], icon: Search },
-    { id: 6, name: 'Complete', fields: [], icon: CheckCircle },
+    { id: 1, name: 'Parties & Purpose', fields: ['title', 'offereeEmail', 'offereeName', 'terms'], icon: Group },
+    { id: 2, name: 'Define Terms', fields: ['paymentAmount', 'paymentDueDate'], icon: DollarSign },
+    { id: 3, name: 'Review & Sign', fields: [], icon: Handshake },
 ];
 
-const FormStep = ({ title, description, children }: { title: string, description: string, children: ReactNode }) => (
-    <div>
-        <h2 className="text-2xl font-bold font-headline">{title}</h2>
-        <p className="text-muted-foreground mt-1 mb-6">{description}</p>
-        <div className="space-y-6">{children}</div>
-    </div>
-);
 
-
-// --- Step Components ---
-
-const AgreementTypeStep = () => {
-    const { control, watch, formState: { errors } } = useFormContext<OfferFormData>();
-    const agreementType = watch('agreementType');
-    const agreementTypes = ["Simple Exchange", "Loan Agreement", "Service Agreement"];
-
-    return (
-        <FormStep title="Let's start your agreement!" description="What kind of handshake are we making today?">
-             <Controller
-                name="agreementType"
-                control={control}
-                render={({ field }) => (
-                    <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {[...agreementTypes, "Other"].map(type => (
-                            <Label key={type} htmlFor={type} className={cn("flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent/10 hover:text-accent-foreground has-[input:checked]:border-primary has-[input:checked]:bg-primary/5 cursor-pointer")}>
-                                <RadioGroupItem value={type} id={type} className="sr-only" />
-                                <p className="mb-0 font-semibold">{type}</p>
-                            </Label>
-                        ))}
-                    </RadioGroup>
-                )}
-            />
-            {errors.agreementType && <p className="text-sm font-medium text-destructive">{errors.agreementType.message}</p>}
-            {agreementType === 'Other' && (
-                <Controller
-                    name="customAgreementType"
-                    control={control}
-                    render={({ field }) => (
-                        <div className="space-y-2">
-                            <Label htmlFor="customAgreementType">Custom Agreement Type</Label>
-                            <Input {...field} id="customAgreementType" placeholder="e.g., Rental Agreement" />
-                            {errors.customAgreementType && <p className="text-sm font-medium text-destructive">{errors.customAgreementType.message}</p>}
-                        </div>
-                    )}
-                />
-            )}
-        </FormStep>
-    );
-};
-
-const PartiesStep = () => {
-    const { register, control, formState: { errors } } = useFormContext<OfferFormData>();
-    const { fields, append, remove } = useFieldArray({
-        control,
-        name: "offerees"
-    });
-
-    return (
-        <FormStep title="Who's shaking hands?" description="Tell us who's making the offer and who's receiving it.">
-            <Card>
-                <CardHeader>
-                    <CardTitle className="text-lg">You (The Offeror)</CardTitle>
-                </CardHeader>
-                <CardContent className="grid sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="offerorName">Your Name</Label>
-                        <Input id="offerorName" {...register('offerorName')} placeholder="Alice Smith" />
-                        {errors.offerorName && <p className="text-sm font-medium text-destructive">{errors.offerorName.message}</p>}
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="offerorEmail">Your Email</Label>
-                        <Input id="offerorEmail" type="email" {...register('offerorEmail')} placeholder="alice@example.com" />
-                        {errors.offerorEmail && <p className="text-sm font-medium text-destructive">{errors.offerorEmail.message}</p>}
-                    </div>
-                </CardContent>
-            </Card>
-            <Card>
-                <CardHeader>
-                    <CardTitle className="text-lg">The Other Parties (The Offerees)</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    {fields.map((field, index) => (
-                        <div key={field.id} className="p-4 border rounded-md space-y-4 bg-muted/50 relative">
-                             {fields.length > 1 && (
-                                <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2 text-muted-foreground hover:text-destructive" onClick={() => remove(index)}>
-                                    <Trash2 className="w-4 h-4" />
-                                </Button>
-                            )}
-                            <div className="grid sm:grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor={`offerees.${index}.name`}>Their Name</Label>
-                                    <Input id={`offerees.${index}.name`} {...register(`offerees.${index}.name`)} placeholder="Bob Johnson" />
-                                    {errors.offerees?.[index]?.name && <p className="text-sm font-medium text-destructive">{errors.offerees?.[index]?.name?.message}</p>}
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor={`offerees.${index}.email`}>Their Email</Label>
-                                    <Input id={`offerees.${index}.email`} type="email" {...register(`offerees.${index}.email`)} placeholder="bob@example.com" />
-                                    {errors.offerees?.[index]?.email && <p className="text-sm font-medium text-destructive">{errors.offerees?.[index]?.email?.message}</p>}
-                                </div>
-                            </div>
-                        </div>
-                    ))}
-                     {errors.offerees?.root && <p className="text-sm font-medium text-destructive">{errors.offerees.root.message}</p>}
-                </CardContent>
-                <CardFooter>
-                     <Button type="button" variant="outline" onClick={() => append({ name: "", email: "" })}>
-                        <Plus className="mr-2" /> Add Another Party
-                    </Button>
-                </CardFooter>
-            </Card>
-        </FormStep>
-    );
-};
-
-const TermsStep = () => {
-    const { register, control, watch, formState: { errors } } = useFormContext<OfferFormData>();
-    const { fields, append, remove } = useFieldArray({ control, name: "specificTerms" });
-    const [aiResult, setAiResult] = useState<AgreementCompletenessCheckOutput & { error?: string } | null>(null);
-    const [isChecking, setIsChecking] = useState(false);
-    const terms = watch('terms');
-
-    const handleCheckCompleteness = async () => {
-        setIsChecking(true);
-        setAiResult(null);
-        const result = await checkCompleteness(terms);
-        setAiResult(result);
-        setIsChecking(false);
-    };
-
-    return (
-        <FormStep title="What's the deal?" description="Describe the core purpose of your agreement, then add specific terms for clarity.">
-            <div className="space-y-2">
-                <Label htmlFor="terms">Purpose of Agreement</Label>
-                <Textarea id="terms" {...register('terms')} placeholder="e.g., To formalize the sale of a used bicycle from the Offeror to the Offeree." rows={4} />
-                {errors.terms && <p className="text-sm font-medium text-destructive">{errors.terms.message}</p>}
-            </div>
-
-            <Card className="bg-secondary/50">
-                <CardHeader>
-                     <CardTitle className="text-lg">Specific Terms & Conditions</CardTitle>
-                    <CardDescription>Add specific, numbered terms to your agreement. This is optional but highly recommended for clarity.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                     {fields.map((field, index) => (
-                        <div key={field.id} className="p-4 border rounded-md space-y-4 bg-background relative">
-                            <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2 text-muted-foreground hover:text-destructive" onClick={() => remove(index)}>
-                                <Trash2 className="w-4 h-4" />
-                            </Button>
-                            <div className="space-y-2">
-                                <Label htmlFor={`specificTerms.${index}.title`}>Term {index + 1} Title</Label>
-                                <Input id={`specificTerms.${index}.title`} {...register(`specificTerms.${index}.title`)} placeholder="e.g., The Product" />
-                                {errors.specificTerms?.[index]?.title && <p className="text-sm font-medium text-destructive">{errors.specificTerms?.[index]?.title?.message}</p>}
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor={`specificTerms.${index}.description`}>Term {index + 1} Description</Label>
-                                <Textarea id={`specificTerms.${index}.description`} {...register(`specificTerms.${index}.description`)} placeholder="e.g., One (1) used bicycle, sold as-is." rows={2} />
-                                {errors.specificTerms?.[index]?.description && <p className="text-sm font-medium text-destructive">{errors.specificTerms?.[index]?.description?.message}</p>}
-                            </div>
-                        </div>
-                    ))}
-                </CardContent>
-                <CardFooter>
-                    <Button type="button" variant="outline" onClick={() => append({ title: "", description: "" })}>
-                        <Plus className="mr-2" /> Add Term
-                    </Button>
-                </CardFooter>
-            </Card>
-            
-            <Card className="bg-secondary/50">
-                <CardHeader>
-                    <CardTitle className="text-lg">Other Details (Optional)</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="grid sm:grid-cols-3 gap-4">
-                        <div className="space-y-2">
-                            <Label>Payment Amount</Label>
-                            <Input {...register('paymentAmount')} placeholder="e.g., $100.00" />
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Payment Due Date</Label>
-                            <Input {...register('paymentDueDate')} placeholder="e.g., Upon delivery" />
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Payment Method</Label>
-                            <Input {...register('paymentMethod')} placeholder="e.g., Cash" />
-                        </div>
-                    </div>
-                    <div className="space-y-2">
-                        <Label>Duration / Completion Date</Label>
-                        <Input {...register('duration')} placeholder="e.g., Agreement concludes upon payment." />
-                    </div>
-                </CardContent>
-            </Card>
-
-            <div>
-                {aiResult && (
-                    <Card className="bg-background">
-                        <CardContent className="pt-6">
-                            {aiResult.error ? (
-                                <Alert variant="destructive">
-                                    <AlertTriangle className="h-4 w-4" />
-                                    <AlertTitle>Error</AlertTitle>
-                                    <AlertDescription>{aiResult.error}</AlertDescription>
-                                </Alert>
-                            ) : (
-                                <div className="space-y-4">
-                                    {aiResult.isComplete ? (
-                                        <Alert variant="default" className="bg-green-100 dark:bg-green-900/30 border-green-300 dark:border-green-700">
-                                            <ShieldCheck className="h-4 w-4 text-green-600 dark:text-green-400" />
-                                            <AlertTitle className="text-green-800 dark:text-green-300">Looks Good!</AlertTitle>
-                                            <AlertDescription className="text-green-700 dark:text-green-400">The purpose statement appears to be comprehensive.</AlertDescription>
-                                        </Alert>
-                                    ) : (
-                                        <Alert variant="destructive">
-                                            <AlertTriangle className="h-4 w-4" />
-                                            <AlertTitle>Potentially Missing Details</AlertTitle>
-                                            <AlertDescription>
-                                                <ul className="list-disc pl-5 mt-2">{aiResult.missingDetails?.map((detail, i) => <li key={i}>{detail}</li>)}</ul>
-                                            </AlertDescription>
-                                        </Alert>
-                                    )}
-
-                                    {aiResult.suggestions && aiResult.suggestions.length > 0 && (
-                                        <Alert>
-                                            <Lightbulb className="h-4 w-4" />
-                                            <AlertTitle>Suggestions for Improvement</AlertTitle>
-                                            <AlertDescription>
-                                                <ul className="list-disc pl-5 mt-2">{aiResult.suggestions.map((suggestion, i) => <li key={i}>{suggestion}</li>)}</ul>
-                                            </AlertDescription>
-                                        </Alert>
-                                    )}
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-                )}
-                <Button type="button" variant="outline" onClick={handleCheckCompleteness} disabled={isChecking || !terms || terms.length < 20}>
-                    {isChecking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2" />}
-                    AI Completeness Check (on Purpose)
-                </Button>
-            </div>
-        </FormStep>
-    );
-};
-
-const LocationStep = () => {
+function Step1({ onNext }: { onNext: () => Promise<void> }) {
     const { register, formState: { errors } } = useFormContext<OfferFormData>();
-    return (
-        <FormStep title="Where is this happening?" description="Knowing the location can help define the governing law for your handshake. This is optional.">
-            <div className="space-y-2">
-                <Label htmlFor="location">Governing Law (e.g., State, Country)</Label>
-                <Input id="location" {...register('location')} placeholder="e.g., California, USA" />
-                <p className="text-sm text-muted-foreground">This helps determine which jurisdiction's laws apply to the agreement.</p>
-                {errors.location && <p className="text-sm font-medium text-destructive">{errors.location.message}</p>}
-            </div>
-        </FormStep>
-    );
-};
+    const [isPending, startTransition] = useTransition();
 
-const ReviewStep = ({ onEdit }: { onEdit: (step: number) => void }) => {
-    const { getValues } = useFormContext<OfferFormData>();
-    const data = getValues();
-    
-    return (
-        <FormStep title="Ready to shake?" description="Take a moment to ensure everything looks right. Once confirmed, your agreement will be created.">
-            <AgreementPreview data={data} onEdit={onEdit} />
-            <Alert>
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>Disclaimer</AlertTitle>
-                <AlertDescription>
-                    This tool helps create simple agreements. For complex matters, please consult a legal professional.
-                </AlertDescription>
-            </Alert>
-        </FormStep>
-    );
-};
-
-const SuccessStep = ({ offer, onReset }: { offer: Offer, onReset: () => void }) => {
-    const { toast } = useToast();
-    const [offerUrl, setOfferUrl] = useState('');
-
-    useEffect(() => {
-        if (typeof window !== 'undefined') {
-          setOfferUrl(`${window.location.origin}/offers/${offer.id}`);
-        }
-    }, [offer.id]);
-    
-    const copyToClipboard = (text: string) => {
-        if (!text) return;
-        navigator.clipboard.writeText(text);
-        toast({ title: "Copied!", description: "The URL has been copied to your clipboard." });
+    const handleNext = () => {
+        startTransition(async () => {
+            await onNext();
+        });
     }
 
     return (
-        <div className="text-center py-10">
-            <PartyPopper className="w-16 h-16 mx-auto text-accent mb-4" />
-            <h2 className="text-3xl font-bold font-headline">Your Handshake is Ready!</h2>
-            <p className="text-muted-foreground mt-2 mb-6">Share this unique link with the other party so they can view and accept your terms.</p>
-            
-            {offerUrl ? (
-                <div className="bg-muted/50 rounded-lg p-4 flex items-center justify-between gap-4 max-w-lg mx-auto">
-                    <p className="text-sm font-mono truncate">{offerUrl}</p>
-                    <Button size="icon" variant="ghost" onClick={() => copyToClipboard(offerUrl)}>
-                        <Copy className="h-5 w-5" />
-                    </Button>
-                </div>
-            ) : (
-                 <div className="bg-muted/50 rounded-lg p-4 flex items-center justify-center gap-4 max-w-lg mx-auto">
-                    <Loader2 className="w-5 h-5 animate-spin"/>
-                    <p className="text-sm font-mono">Generating shareable link...</p>
-                </div>
-            )}
+        <div className="flex-1 space-y-8">
+            <div className="flex flex-col gap-2">
+                <label className="text-foreground dark:text-gray-200 text-base font-bold">Agreement Title</label>
+                <Input {...register('title')} placeholder="e.g. Freelance Design Project" className="p-4 h-auto rounded-xl" />
+                {errors.title && <p className="text-sm font-medium text-destructive">{errors.title.message}</p>}
+            </div>
 
-            <div className="flex flex-col sm:flex-row justify-center gap-4 mt-8">
-                <Button asChild size="lg">
-                    <Link href="/">Go to Home</Link>
+            <div className="flex flex-col gap-2">
+                <label className="text-foreground dark:text-gray-200 text-base font-bold">Other Party</label>
+                <div className='space-y-2'>
+                    <Input {...register('offereeName')} placeholder="Their Name" className="p-4 h-auto rounded-xl" />
+                    {errors.offereeName && <p className="text-sm font-medium text-destructive">{errors.offereeName.message}</p>}
+                    <Input {...register('offereeEmail')} type="email" placeholder="Their Email" className="p-4 h-auto rounded-xl" />
+                    {errors.offereeEmail && <p className="text-sm font-medium text-destructive">{errors.offereeEmail.message}</p>}
+                </div>
+                <p className="text-xs text-muted-foreground px-1">We'll send them a secure link to review and sign.</p>
+            </div>
+
+            <div className="flex flex-col gap-2">
+                <label className="text-foreground dark:text-gray-200 text-base font-bold">Description of the Deal</label>
+                <Textarea {...register('terms')} placeholder="Be clear about the deliverables and timeline. What are the core expectations for both sides?" className="min-h-[160px] rounded-xl p-4" />
+                {errors.terms && <p className="text-sm font-medium text-destructive">{errors.terms.message}</p>}
+            </div>
+             <div className="flex justify-end gap-4">
+                <Button onClick={handleNext} disabled={isPending} className="h-12 px-6 rounded-xl flex-[2] bg-primary text-white font-bold shadow-lg shadow-primary/20 transition-all">
+                    {isPending ? <Loader2 className="animate-spin" /> : "Next: Define Terms"}
+                    {!isPending && <ArrowRight className="ml-2 w-5 h-5" />}
                 </Button>
-                <Button size="lg" variant="outline" onClick={onReset}>Create Another Agreement</Button>
             </div>
         </div>
     );
 }
 
-// --- Main Form Component ---
+function Step2({ onNext, onBack }: { onNext: () => Promise<void>, onBack: () => void }) {
+    const { register, formState: { errors } } = useFormContext<OfferFormData>();
+    const [isPending, startTransition] = useTransition();
 
-function useCreateOfferForm() {
-    const searchParams = useSearchParams();
-    const draftId = searchParams.get('id');
+    const handleNext = () => {
+        startTransition(async () => {
+            await onNext();
+        });
+    }
 
-    const defaultValues: OfferFormData = {
-        offerorName: '',
-        offerorEmail: '',
-        offerees: [{ name: '', email: '' }],
-        terms: '',
-        specificTerms: [],
-        paymentAmount: '',
-        paymentDueDate: '',
-        paymentMethod: '',
-        duration: '',
-        location: '',
-        agreementType: '',
-        customAgreementType: '',
-    };
-    
-    const methods = useForm<OfferFormData>({
-        resolver: zodResolver(offerSchema),
-        defaultValues,
-    });
+    return (
+        <div className="flex-1 space-y-8">
+            <div className="flex flex-col gap-2">
+                <label className="text-foreground dark:text-gray-200 text-base font-bold">Total Payment (Optional)</label>
+                <div className='relative'>
+                    <DollarSign className='absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground' />
+                    <Input {...register('paymentAmount')} placeholder="1,200.00" className="p-4 pl-12 h-auto rounded-xl" />
+                </div>
+                {errors.paymentAmount && <p className="text-sm font-medium text-destructive">{errors.paymentAmount.message}</p>}
+            </div>
 
-    useEffect(() => {
-        if (draftId) {
-            getOffer(draftId).then(offer => {
-                if (offer && offer.status === 'draft') {
-                    const { title, ...rest } = offer;
-                    methods.reset({
-                        ...defaultValues,
-                        ...rest,
-                        agreementType: title, // This is a simplification
-                    });
-                }
-            });
-        }
-    }, [draftId, methods]);
-    
-    return methods;
+            <div className="flex flex-col gap-2">
+                <label className="text-foreground dark:text-gray-200 text-base font-bold">Due Date (Optional)</label>
+                 <div className='relative'>
+                    <Calendar className='absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground' />
+                    <Input {...register('paymentDueDate')} placeholder="e.g., Oct 24" className="p-4 pl-12 h-auto rounded-xl" />
+                </div>
+                {errors.paymentDueDate && <p className="text-sm font-medium text-destructive">{errors.paymentDueDate.message}</p>}
+            </div>
+            
+            <div className="flex justify-between gap-4">
+                <Button type="button" variant="outline" onClick={onBack} disabled={isPending} className="h-12 px-6 rounded-xl">
+                    <ArrowLeft className="mr-2" /> Back
+                </Button>
+                <Button onClick={handleNext} disabled={isPending} className="h-12 px-6 rounded-xl flex-[2] bg-primary text-white font-bold shadow-lg shadow-primary/20 transition-all">
+                     {isPending ? <Loader2 className="animate-spin" /> : "Next: Review"}
+                    {!isPending && <ArrowRight className="ml-2 w-5 h-5" />}
+                </Button>
+            </div>
+        </div>
+    );
 }
 
+function Step3({ onBack }: { onBack: () => void }) {
+    const { getValues } = useFormContext<OfferFormData>();
+    const data = getValues();
+    const offeror = DUMMY_USER;
+
+    return (
+        <div className="flex-1">
+             <div className="shadow-lg bg-card dark:bg-card-dark border border-border dark:border-gray-800 rounded-xl p-6 relative overflow-hidden">
+                <div className="mb-8 relative z-10">
+                    <div className="flex items-center gap-2 mb-4">
+                        <Group className="text-success text-sm" />
+                        <h4 className="text-foreground/50 dark:text-gray-500 text-xs font-bold uppercase tracking-widest">Contracting Parties</h4>
+                    </div>
+                    <div className="flex flex-col gap-4">
+                        <div className="flex items-center gap-3">
+                            <Avatar className='h-10 w-10'>
+                                <AvatarFallback className="bg-primary text-primary-foreground font-bold">{getInitials(offeror.name)}</AvatarFallback>
+                            </Avatar>
+                            <div>
+                                <p className="text-foreground dark:text-white font-bold leading-none">{offeror.name}</p>
+                                <p className="text-foreground/50 dark:text-gray-500 text-xs mt-1">Provider</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center justify-center w-8 ml-1">
+                            <LinkIcon className="text-foreground/20 dark:text-white/20 text-sm" />
+                        </div>
+                        <div className="flex items-center gap-3">
+                             <Avatar className='h-10 w-10'>
+                                <AvatarFallback className="bg-accent text-white font-bold">{getInitials(data.offereeName || 'C')}</AvatarFallback>
+                            </Avatar>
+                            <div>
+                                <p className="text-foreground dark:text-white font-bold leading-none">{data.offereeName}</p>
+                                <p className="text-foreground/50 dark:text-gray-500 text-xs mt-1">Client</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="h-px bg-foreground/5 dark:bg-white/5 w-full mb-8"></div>
+
+                <div className="mb-8">
+                    <div className="flex items-center gap-2 mb-4">
+                        <FileText className="text-success text-sm" />
+                        <h4 className="text-foreground/50 dark:text-gray-500 text-xs font-bold uppercase tracking-widest">The Terms</h4>
+                    </div>
+                    <div className="bg-background dark:bg-background-dark/50 rounded-lg p-4 border border-foreground/5 dark:border-white/5">
+                        <p className="text-foreground dark:text-gray-300 text-sm leading-relaxed italic">
+                           "{data.terms}"
+                        </p>
+                    </div>
+                </div>
+                {(data.paymentAmount || data.paymentDueDate) && (
+                     <div className="grid grid-cols-2 gap-4">
+                        {data.paymentAmount && (
+                            <div className="bg-primary/5 dark:bg-primary/20 p-4 rounded-lg">
+                                <p className="text-primary/50 dark:text-gray-400 text-[10px] font-bold uppercase tracking-wider mb-1">Total Payment</p>
+                                <p className="text-primary dark:text-white text-xl font-extrabold">{data.paymentAmount}</p>
+                            </div>
+                        )}
+                        {data.paymentDueDate && (
+                            <div className="bg-primary/5 dark:bg-primary/20 p-4 rounded-lg">
+                                <p className="text-primary/50 dark:text-gray-400 text-[10px] font-bold uppercase tracking-wider mb-1">Due Date</p>
+                                <p className="text-primary dark:text-white text-xl font-extrabold">{data.paymentDueDate}</p>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+            <div className="p-6">
+                 <Button type="button" variant="ghost" onClick={onBack} className="h-12 px-6 rounded-xl flex items-center justify-center gap-2 w-full">
+                    <Edit className="w-4 h-4" /> Edit
+                </Button>
+            </div>
+        </div>
+    );
+}
 
 export function CreateOfferForm() {
     const [currentStep, setCurrentStep] = useState(1);
     const [isPending, startTransition] = useTransition();
     const { toast } = useToast();
-    const [createdOffer, setCreatedOffer] = useState<Offer | null>(null);
+    const router = useRouter();
 
-    const methods = useCreateOfferForm();
-    const { trigger, handleSubmit, reset } = methods;
+    const methods = useForm<OfferFormData>({
+        resolver: zodResolver(offerSchema),
+        defaultValues: {
+            title: '',
+            offereeEmail: '',
+            offereeName: '',
+            terms: '',
+            paymentAmount: '',
+            paymentDueDate: '',
+        },
+    });
+    const { trigger, handleSubmit } = methods;
 
     const nextStep = async () => {
         const fields = steps[currentStep - 1].fields as FieldName[];
         const output = await trigger(fields, { shouldFocus: true });
         if (!output) return;
 
-        if (currentStep < 5) {
+        if (currentStep < 3) {
             setCurrentStep(step => step + 1);
-        } else {
-            handleSubmit(processForm)();
         }
     };
 
@@ -459,19 +243,18 @@ export function CreateOfferForm() {
             setCurrentStep(step => step - 1);
         }
     };
-    
-    const goToStep = (step: number) => {
-        if(step < currentStep) {
-            setCurrentStep(step);
-        }
-    }
 
     const processForm = (data: OfferFormData) => {
         startTransition(async () => {
-            const result = await createOffer(data);
+            const result = await createOffer({
+                ...data,
+                offerorName: DUMMY_USER.name,
+                offerorEmail: DUMMY_USER.email,
+                offerees: [{ name: data.offereeName, email: data.offereeEmail }]
+            });
             if (result.success && result.offer) {
-                setCreatedOffer(result.offer);
-                setCurrentStep(6);
+                toast({ title: "Handshake Sent!", description: "Your offer has been sent for review." });
+                router.push(`/offers/${result.offer.id}`);
             } else {
                 toast({
                     title: "Error Creating Offer",
@@ -481,53 +264,53 @@ export function CreateOfferForm() {
             }
         });
     };
-    
-    const handleReset = () => {
-        reset();
-        setCurrentStep(1);
-        setCreatedOffer(null);
-    }
 
-    if(currentStep === 6 && createdOffer) {
-        return <SuccessStep offer={createdOffer} onReset={handleReset} />
-    }
-
-    const StepIcon = steps[currentStep - 1].icon;
+    const stepInfo = steps[currentStep - 1];
 
     return (
         <FormProvider {...methods}>
-            <Card>
-                <CardHeader>
-                    <div className="flex items-center gap-4">
-                         <div className="bg-primary/10 p-3 rounded-full">
-                            <StepIcon className="w-6 h-6 text-primary" />
-                         </div>
-                         <div>
-                            <p className="text-sm font-medium text-primary">Step {currentStep} of 5</p>
-                            <CardTitle className="font-headline text-2xl">{steps[currentStep-1].name}</CardTitle>
-                         </div>
+            <div className="flex flex-col h-full">
+                <header className="sticky top-0 z-10 bg-background/80 dark:bg-background-dark/80 backdrop-blur-md">
+                    <div className="flex items-center p-4 justify-between max-w-lg mx-auto w-full">
+                        <Button variant="ghost" size="icon" onClick={() => currentStep === 1 ? router.back() : prevStep()}>
+                            {currentStep === 1 ? <X /> : <ArrowLeft />}
+                        </Button>
+                        <h1 className="text-foreground dark:text-white text-lg font-bold tracking-tight">New Agreement</h1>
+                        <Button variant="ghost" size="icon">
+                            <Info className="text-primary dark:text-primary/50" />
+                        </Button>
                     </div>
-                    <Progress value={((currentStep-1) / 4) * 100} className="mt-4 h-2" />
-                </CardHeader>
-                <form>
-                    <CardContent>
-                        {currentStep === 1 && <AgreementTypeStep />}
-                        {currentStep === 2 && <PartiesStep />}
-                        {currentStep === 3 && <TermsStep />}
-                        {currentStep === 4 && <LocationStep />}
-                        {currentStep === 5 && <ReviewStep onEdit={goToStep} />}
-                    </CardContent>
-                    <CardFooter className="flex justify-between">
-                        <Button type="button" variant="outline" onClick={prevStep} disabled={currentStep === 1}>
-                            <ArrowLeft className="mr-2" /> Back
-                        </Button>
-                        <Button type="button" onClick={nextStep} disabled={isPending}>
-                            {isPending ? <Loader2 className="animate-spin" /> : currentStep === 5 ? "Initiate Handshake!" : "Next"}
-                            {currentStep < 5 && <ArrowRight className="ml-2" />}
-                        </Button>
-                    </CardFooter>
-                </form>
-            </Card>
+                </header>
+                <main className="flex-1 max-w-lg mx-auto w-full flex flex-col">
+                    <div className="p-6">
+                        <div className="flex flex-col gap-4">
+                            <div className="flex justify-between items-end">
+                                <div>
+                                    <span className="text-primary font-bold text-xs uppercase tracking-widest">Step {currentStep} of 3</span>
+                                    <h2 className="text-foreground dark:text-white text-2xl font-extrabold">{stepInfo.name}</h2>
+                                </div>
+                                <p className="text-primary font-bold text-lg">{Math.round((currentStep / 3) * 100)}%</p>
+                            </div>
+                            <Progress value={(currentStep / 3) * 100} className="h-2.5" />
+                        </div>
+                    </div>
+                    <form onSubmit={handleSubmit(processForm)} className="flex-1 px-6 space-y-6 pb-32">
+                        {currentStep === 1 && <Step1 onNext={nextStep} />}
+                        {currentStep === 2 && <Step2 onNext={nextStep} onBack={prevStep} />}
+                        {currentStep === 3 && <Step3 onBack={prevStep} />}
+                    </form>
+                </main>
+                 {currentStep === 3 && (
+                    <footer className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-background via-background/95 to-transparent dark:from-background-dark dark:via-background-dark/95">
+                        <div className="max-w-lg mx-auto flex gap-4">
+                            <Button onClick={handleSubmit(processForm)} disabled={isPending} className="h-14 rounded-xl flex-1 bg-primary text-white font-bold shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2">
+                                {isPending ? <Loader2 className="animate-spin" /> : "Send Handshake"}
+                                {!isPending && <HandshakeIcon className="w-5 h-5" />}
+                            </Button>
+                        </div>
+                    </footer>
+                 )}
+            </div>
         </FormProvider>
     );
 }

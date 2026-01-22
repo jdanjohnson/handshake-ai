@@ -2,11 +2,11 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutGrid, FileArchive, Users, UserCircle } from 'lucide-react';
+import { Home, FileArchive, Users, UserCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
-  { href: "/", label: "Home", icon: LayoutGrid },
+  { href: "/", label: "Home", icon: Home },
   { href: "/vault", label: "Vault", icon: FileArchive },
   { href: "/network", label: "Network", icon: Users },
   { href: "/profile", label: "Profile", icon: UserCircle },
@@ -16,8 +16,8 @@ export default function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <footer className="fixed bottom-0 left-0 right-0 h-20 bg-card border-t z-50">
-      <nav className="h-full">
+    <footer className="fixed bottom-0 left-0 right-0 bg-background/90 dark:bg-background-dark/90 backdrop-blur-lg border-t border-border z-50">
+      <nav className="h-20 max-w-lg mx-auto">
         <ul className="flex justify-around items-center h-full">
           {navItems.map((item) => {
             const isActive = (item.href === "/" && pathname === "/") || (item.href !== "/" && pathname.startsWith(item.href));
